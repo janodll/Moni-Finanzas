@@ -75,7 +75,7 @@ export function setEditingTransactionId(id) {
   editingTransactionId = id;
 }
 
-// Inicializar la autenticación local (NEW-01)
+// Inicializar la autenticación local (carga de token)
 export async function initLocalAuth() {
   try {
     const response = await fetch(`${API_BASE}/api/session-token`);
@@ -92,13 +92,6 @@ export async function initLocalAuth() {
   const savedToken = localStorage.getItem("MONI_LOCAL_TOKEN");
   if (savedToken) {
     LOCAL_TOKEN = savedToken;
-    return;
-  }
-
-  const userToken = prompt("Acceso Remoto Protegido\n\nPor seguridad, ingresa el Token de Acceso Local de tu servidor para ver tus finanzas:");
-  if (userToken) {
-    LOCAL_TOKEN = userToken.trim();
-    localStorage.setItem("MONI_LOCAL_TOKEN", LOCAL_TOKEN);
   }
 }
 
@@ -112,20 +105,27 @@ export async function fetchData() {
     if (response.status === 401) {
       console.warn("Token local incorrecto o expirado.");
       localStorage.removeItem("MONI_LOCAL_TOKEN");
-      import('./ui/components.js').then(({ showToast }) => {
-        showToast("Acceso Denegado", "Token de Acceso Local inválido. Recargando...", "error");
-        setTimeout(() => window.location.reload(), 1500);
-      });
-      return;
+      
+      const userToken = prompt("Acceso Protegido\n\nIngresa el Token de Acceso Local de tu servidor para ver tus finanzas:");
+      if (userToken) {
+        LOCAL_TOKEN = userToken.trim();
+        localStorage.setItem("MONI_LOCAL_TOKEN", LOCAL_TOKEN);
+        return fetchData(); // Reintentar con el nuevo token
+      } else {
+        isLocalStorageMode = true;
+      }
+    } else if (!response.ok) {
+      throw new Error("Error al consultar la API: " + response.statusText);
+    } else {
+      fetchedData = await response.json();
+      isLocalStorageMode = false;
     }
-    if (!response.ok) throw new Error("Error al consultar la API: " + response.statusText);
-    
-    fetchedData = await response.json();
-    isLocalStorageMode = false;
   } catch (error) {
     console.warn("Error al conectar con el servidor, activando modo LocalStorage:", error);
     isLocalStorageMode = true;
-    
+  }
+
+  if (isLocalStorageMode) {
     const localSaved = localStorage.getItem("MONI_STATE");
     if (localSaved) {
       try {
