@@ -36,7 +36,9 @@ import {
 import { 
   populateConfigForm, 
   renderCategoriesSettings, 
-  setupSettings 
+  setupSettings,
+  renderAccountsSettings,
+  renderCardsSettings
 } from './ui/settings.js';
 import { 
   setupCommandPalette, 
@@ -777,6 +779,10 @@ export function updateUI() {
 
   // 11. Renderizar gestión de categorías
   renderCategoriesSettings();
+
+  // 11b. Renderizar gestión de cuentas y tarjetas
+  renderAccountsSettings();
+  renderCardsSettings();
 
   // 12. Renderizar reporte dinámico si está cargado
   const reportSelect = document.getElementById("report-month-select");

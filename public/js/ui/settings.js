@@ -288,4 +288,212 @@ export function setupSettings() {
       reader.readAsText(file);
     });
   }
+
+  // 6. Agregar Cuenta Bancaria
+  const formAgregarCta = document.getElementById("form-agregar-cuenta");
+  if (formAgregarCta) {
+    formAgregarCta.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nameInput = document.getElementById("cta-nuevo-nombre");
+      const titularInput = document.getElementById("cta-nuevo-titular");
+      const tipoSelect = document.getElementById("cta-nuevo-tipo");
+
+      if (!nameInput || !titularInput || !tipoSelect) return;
+
+      const nombre = nameInput.value.trim();
+      const titular = titularInput.value.trim();
+      const tipo = tipoSelect.value;
+
+      if (!nombre || !titular) {
+        showToast("Campos inválidos", "Por favor completa todos los campos para agregar la cuenta.", "error");
+        return;
+      }
+
+      // Generar nuevo ID único para cuentas
+      const nuevoId = state.cuentas.length > 0 ? Math.max(...state.cuentas.map(c => parseInt(c.id) || 0)) + 1 : 1;
+
+      // Crear nueva cuenta
+      state.cuentas.push({
+        id: nuevoId,
+        nombre: nombre,
+        titular: titular,
+        tipo: tipo
+      });
+
+      // Limpiar inputs y guardar
+      nameInput.value = "";
+      titularInput.value = "";
+      saveState();
+
+      showToast("Cuenta Creada", `La cuenta "${nombre}" ha sido creada exitosamente.`, "success");
+    });
+  }
+
+  // 7. Agregar Tarjeta de Crédito
+  const formAgregarTj = document.getElementById("form-agregar-tarjeta");
+  if (formAgregarTj) {
+    formAgregarTj.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nameInput = document.getElementById("tj-nuevo-nombre");
+      const titularInput = document.getElementById("tj-nuevo-titular");
+
+      if (!nameInput || !titularInput) return;
+
+      const nombre = nameInput.value.trim();
+      const titular = titularInput.value.trim();
+
+      if (!nombre || !titular) {
+        showToast("Campos inválidos", "Por favor completa todos los campos para agregar la tarjeta.", "error");
+        return;
+      }
+
+      // Generar nuevo ID único para tarjetas
+      const nuevoId = state.tarjetas.length > 0 ? Math.max(...state.tarjetas.map(t => parseInt(t.id) || 0)) + 1 : 1;
+
+      // Crear nueva tarjeta
+      state.tarjetas.push({
+        id: nuevoId,
+        nombre: nombre,
+        tipo: "Credito",
+        titular: titular
+      });
+
+      // Limpiar inputs y guardar
+      nameInput.value = "";
+      titularInput.value = "";
+      saveState();
+
+      showToast("Tarjeta Creada", `La tarjeta "${nombre}" ha sido creada exitosamente.`, "success");
+    });
+  }
+}
+
+// Renderizar cuentas en la sección de configuración
+export function renderAccountsSettings() {
+  const container = document.getElementById("config-cuentas-list");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  state.cuentas.forEach(c => {
+    const card = document.createElement("div");
+    card.style.display = "flex";
+    card.style.alignItems = "center";
+    card.style.justifyContent = "space-between";
+    card.style.padding = "10px 14px";
+    card.style.background = "rgba(255, 255, 255, 0.4)";
+    card.style.border = "1px solid var(--border-color)";
+    card.style.borderRadius = "12px";
+    card.style.boxShadow = "var(--shadow-sm)";
+
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="category-badge-icon" style="background-color: #ECFDF5; color: #10B981; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+          <i data-lucide="${c.tipo === 'Efectivo' ? 'wallet' : 'landmark'}" style="width: 16px; height: 16px;"></i>
+        </span>
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${c.nombre}</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${c.tipo} • Titular: ${c.titular}</span>
+        </div>
+      </div>
+      <div>
+        <button class="btn-delete-account btn-icon" data-id="${c.id}" style="color: var(--text-red); border: none; background: transparent; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;" title="Eliminar cuenta">
+          <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+        </button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Agregar event listeners a los botones de borrar
+  container.querySelectorAll(".btn-delete-account").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-id"));
+      deleteAccount(id);
+    });
+  });
+
+  safeCreateIcons();
+}
+
+// Renderizar tarjetas en la sección de configuración
+export function renderCardsSettings() {
+  const container = document.getElementById("config-tarjetas-list");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  state.tarjetas.forEach(t => {
+    const card = document.createElement("div");
+    card.style.display = "flex";
+    card.style.alignItems = "center";
+    card.style.justifyContent = "space-between";
+    card.style.padding = "10px 14px";
+    card.style.background = "rgba(255, 255, 255, 0.4)";
+    card.style.border = "1px solid var(--border-color)";
+    card.style.borderRadius = "12px";
+    card.style.boxShadow = "var(--shadow-sm)";
+
+    card.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="category-badge-icon" style="background-color: #F5F3FF; color: #8B5CF6; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+          <i data-lucide="credit-card" style="width: 16px; height: 16px;"></i>
+        </span>
+        <div style="display: flex; flex-direction: column;">
+          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${t.nombre}</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Crédito • Titular: ${t.titular}</span>
+        </div>
+      </div>
+      <div>
+        <button class="btn-delete-card btn-icon" data-id="${t.id}" style="color: var(--text-red); border: none; background: transparent; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;" title="Eliminar tarjeta">
+          <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+        </button>
+      </div>
+    `;
+
+    container.appendChild(card);
+  });
+
+  // Agregar event listeners a los botones de borrar
+  container.querySelectorAll(".btn-delete-card").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-id"));
+      deleteCard(id);
+    });
+  });
+
+  safeCreateIcons();
+}
+
+// Eliminar cuenta bancaria
+export function deleteAccount(id) {
+  const countTx = state.transacciones.filter(tx => (parseInt(tx.cuenta_id) || 0) === id).length;
+  if (countTx > 0) {
+    showToast("Acción bloqueada", `No se puede eliminar esta cuenta porque tiene ${countTx} transacciones asociadas. Reasígnalas o elimínalas primero.`, "error");
+    return;
+  }
+
+  const c = state.cuentas.find(item => item.id === id);
+  if (c && confirm(`¿Estás seguro de que deseas eliminar la cuenta "${c.nombre}"?`)) {
+    state.cuentas = state.cuentas.filter(item => item.id !== id);
+    saveState();
+    showToast("Cuenta eliminada", `La cuenta "${c.nombre}" fue eliminada correctamente.`, "success");
+  }
+}
+
+// Eliminar tarjeta de crédito
+export function deleteCard(id) {
+  const countTx = state.transacciones.filter(tx => (parseInt(tx.tarjeta_id) || 0) === id).length;
+  if (countTx > 0) {
+    showToast("Acción bloqueada", `No se puede eliminar esta tarjeta porque tiene ${countTx} transacciones asociadas. Reasígnalas o elimínalas primero.`, "error");
+    return;
+  }
+
+  const t = state.tarjetas.find(item => item.id === id);
+  if (t && confirm(`¿Estás seguro de que deseas eliminar la tarjeta "${t.nombre}"?`)) {
+    state.tarjetas = state.tarjetas.filter(item => item.id !== id);
+    saveState();
+    showToast("Tarjeta eliminada", `La tarjeta "${t.nombre}" fue eliminada correctamente.`, "success");
+  }
 }

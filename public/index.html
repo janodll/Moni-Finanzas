@@ -622,6 +622,68 @@
             </div>
           </div>
 
+          <!-- SECCIÓN: CUENTAS Y TARJETAS -->
+          <div class="grid-2" style="margin-top: 24px;">
+            <!-- Cuentas Bancarias -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>🏦 Cuentas Bancarias (Débito/Efectivo)</h3>
+              </div>
+              <div class="accounts-config-content">
+                <p class="text-muted" style="font-size: 0.9em; margin-bottom: 15px;">Administra tus cuentas bancarias de débito o efectivo.</p>
+                
+                <form id="form-agregar-cuenta" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                  <div class="form-group" style="flex: 2; min-width: 120px; margin-bottom: 0;">
+                    <label for="cta-nuevo-nombre" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Nombre de Cuenta</label>
+                    <input type="text" id="cta-nuevo-nombre" class="form-control" placeholder="Ej. BCP Ahorros" required style="width: 100%;">
+                  </div>
+                  <div class="form-group" style="flex: 1; min-width: 100px; margin-bottom: 0;">
+                    <label for="cta-nuevo-titular" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Titular</label>
+                    <input type="text" id="cta-nuevo-titular" class="form-control" placeholder="Ej. Yo" required style="width: 100%;">
+                  </div>
+                  <div class="form-group" style="flex: 1; min-width: 100px; margin-bottom: 0;">
+                    <label for="cta-nuevo-tipo" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Tipo</label>
+                    <select id="cta-nuevo-tipo" class="form-control" style="width: 100%;">
+                      <option value="Debito">Débito</option>
+                      <option value="Efectivo">Efectivo</option>
+                    </select>
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="height: 42px;">Agregar</button>
+                </form>
+
+                <div id="config-cuentas-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                  <!-- Se llena con JS -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Tarjetas de Crédito -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>💳 Tarjetas de Crédito</h3>
+              </div>
+              <div class="cards-config-content">
+                <p class="text-muted" style="font-size: 0.9em; margin-bottom: 15px;">Administra tus tarjetas de crédito.</p>
+                
+                <form id="form-agregar-tarjeta" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                  <div class="form-group" style="flex: 2; min-width: 120px; margin-bottom: 0;">
+                    <label for="tj-nuevo-nombre" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Nombre de Tarjeta</label>
+                    <input type="text" id="tj-nuevo-nombre" class="form-control" placeholder="Ej. Visa BBVA" required style="width: 100%;">
+                  </div>
+                  <div class="form-group" style="flex: 1; min-width: 100px; margin-bottom: 0;">
+                    <label for="tj-nuevo-titular" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Titular</label>
+                    <input type="text" id="tj-nuevo-titular" class="form-control" placeholder="Ej. Yo" required style="width: 100%;">
+                  </div>
+                  <button type="submit" class="btn btn-primary" style="height: 42px;">Agregar</button>
+                </form>
+
+                <div id="config-tarjetas-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                  <!-- Se llena con JS -->
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- NUEVA SECCIÓN DE ASISTENTE IA -->
           <div class="dashboard-card bg-white shadow-sm" style="margin-top: 24px;">
             <div class="card-header">
