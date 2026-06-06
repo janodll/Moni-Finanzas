@@ -736,6 +736,13 @@ export function setupFormSubmits() {
 export function updateUI() {
   if (!state.trabajos_pendientes) state.trabajos_pendientes = [];
 
+  // Actualizar texto de bienvenida dinámicamente
+  const welcomeTextEl = document.getElementById("welcome-text");
+  if (welcomeTextEl) {
+    const userName = state.configuracion?.nombre_usuario || "Jano";
+    welcomeTextEl.innerText = `Hola, ${userName}`;
+  }
+
   // 1. Cálculos de Balances
   const calculatedBalances = calculateBalances(state);
 
