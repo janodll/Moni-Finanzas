@@ -6,7 +6,8 @@ import {
   COLOR_PALETTES, 
   DEFAULT_CATEGORY_STYLES, 
   updateState, 
-  saveState 
+  saveState,
+  isLocalStorageMode
 } from '../state.js';
 import { safeCreateIcons, showToast } from './components.js';
 
@@ -28,6 +29,16 @@ export function populateConfigForm() {
   }
   if (confTcUsd) {
     confTcUsd.value = state.configuracion?.tipo_cambio_usd || 3.80;
+  }
+
+  // Actualizar indicador dinámico de ubicación de la base de datos
+  const dbLocationHint = document.getElementById("db-location-hint");
+  if (dbLocationHint) {
+    if (isLocalStorageMode) {
+      dbLocationHint.innerHTML = 'Tus datos están guardados de forma segura en: <span style="font-weight: 600; color: var(--primary-color);">el navegador (LocalStorage)</span>.';
+    } else {
+      dbLocationHint.innerHTML = 'Tus datos están guardados localmente de forma segura en: <code>/Finanzas/datos.json</code>.';
+    }
   }
 }
 
