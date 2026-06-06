@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moni - Tu Asistente de Finanzas Personales</title>
+  <!-- Google Fonts: Outfit (títulos) e Inter (cuerpo) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Lucide Icons para una iconografía premium -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Chart.js para gráficos interactivos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Solución inmediata anti-caché para chevrons de paginación */
+    .btn-icon {
+      padding: 0 !important;
+    }
+    .btn-icon svg,
+    .btn-icon i {
+      width: 18px !important;
+      height: 18px !important;
+      display: inline-block;
+    }
+    /* Solución definitiva para evitar que el símbolo monetario y el valor se separen */
+    .metric-value {
+      display: flex !important;
+      align-items: baseline !important;
+      justify-content: flex-start !important;
+      flex-wrap: nowrap !important;
+      white-space: nowrap !important;
+      font-size: 1.8rem !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+    }
+    .metric-symbol {
+      font-size: 0.8em !important;
+      font-weight: 500 !important;
+      opacity: 0.75 !important;
+      margin-right: 6px !important;
+      display: inline-block !important;
+    }
+    .metric-num {
+      font-weight: 700 !important;
+      display: inline-block !important;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <div class="logo-icon">
+          <i data-lucide="wallet"></i>
+        </div>
+        <span>Moni</span>
+      </div>
+      
+      <!-- Disparador Visual de Barra de Comandos -->
+      <div class="sidebar-search" id="sidebar-trigger-command">
+        <div class="sidebar-search-content">
+          <i data-lucide="search"></i>
+          <span>Buscar o accionar...</span>
+        </div>
+        <kbd>⌘K</kbd>
+      </div>
+
+      <nav class="sidebar-menu">
+        <a href="#" class="menu-item active" data-target="view-resumen">
+          <i data-lucide="layout-dashboard"></i><span>Resumen</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-transacciones">
+          <i data-lucide="arrow-left-right"></i><span>Transacciones</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-presupuestos">
+          <i data-lucide="pie-chart"></i><span>Presupuestos</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-recordatorios">
+          <i data-lucide="bell"></i><span>Recordatorios</span>
+          <span class="badge-count" id="reminder-badge" style="display:none;">0</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-ahorros">
+          <i data-lucide="piggy-bank"></i><span>Metas</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-por-cobrar">
+          <i data-lucide="clock"></i><span>Por Cobrar</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-configuracion">
+          <i data-lucide="settings"></i><span>Ajustes</span>
+        </a>
+        <a href="#" class="menu-item" data-target="view-reportes">
+          <i data-lucide="file-text"></i><span>Reportes</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="assistant-status">
+          <div class="status-indicator online"></div>
+          <div class="status-details">
+            <span class="status-title">Asistente Activo</span>
+            <span class="status-desc">Listo en el chat</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ÁREA PRINCIPAL -->
+    <main class="main-content">
+      <!-- CABECERA -->
+      <header class="main-header">
+        <div class="header-welcome">
+          <h1 id="welcome-text">Hola, Jano</h1>
+          <p id="header-date">Cargando fecha...</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary" id="btn-transferencia">
+            <i data-lucide="repeat"></i> Transferir
+          </button>
+          <button class="btn btn-primary" id="btn-nueva-transaccion">
+            <i data-lucide="plus"></i> Nueva Transacción
+          </button>
+        </div>
+      </header>
+
+      <!-- VISTAS DINÁMICAS -->
+      <div class="view-container">
+        
+        <!-- VISTA: RESUMEN (DASHBOARD) -->
+        <section id="view-resumen" class="app-view active">
+          <!-- Tarjetas de Métricas Principales -->
+          <div class="metrics-grid">
+            <div class="metric-card bg-white shadow-sm">
+              <div class="metric-header">
+                <span class="metric-title">Balance Total</span>
+                <span class="metric-icon color-blue bg-blue-light"><i data-lucide="wallet"></i></span>
+              </div>
+              <h2 class="metric-value" id="val-balance">S/. 0.00</h2>
+              <p class="metric-subtext text-muted" id="sub-balance">Cuentas debito - deudas tarjeta</p>
+            </div>
+            <div class="metric-card bg-white shadow-sm">
+              <div class="metric-header">
+                <span class="metric-title">Ingresos del Mes</span>
+                <span class="metric-icon color-green bg-green-light"><i data-lucide="trending-up"></i></span>
+              </div>
+              <h2 class="metric-value text-green" id="val-ingresos">S/. 0.00</h2>
+              <p class="metric-subtext text-muted" id="sub-ingresos">Este mes en curso</p>
+            </div>
+            <div class="metric-card bg-white shadow-sm">
+              <div class="metric-header">
+                <span class="metric-title">Egresos del Mes</span>
+                <span class="metric-icon color-red bg-red-light"><i data-lucide="trending-down"></i></span>
+              </div>
+              <h2 class="metric-value text-red" id="val-egresos">S/. 0.00</h2>
+              <p class="metric-subtext text-muted" id="sub-egresos">Gastos fijos + variables</p>
+            </div>
+            <div class="metric-card bg-white shadow-sm">
+              <div class="metric-header">
+                <span class="metric-title">Tasa de Ahorro</span>
+                <span class="metric-icon color-amber bg-amber-light"><i data-lucide="percent"></i></span>
+              </div>
+              <h2 class="metric-value" id="val-ahorro">0%</h2>
+              <p class="metric-subtext text-muted" id="sub-ahorro">S/. 0.00 ahorrados hoy</p>
+            </div>
+          </div>
+
+          <!-- Fila de Gráficos -->
+          <div class="dashboard-row grid-2">
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Flujo de Caja Mensual</h3>
+                <div class="card-header-actions">
+                  <span class="legend-dot bg-green"></span> Ingresos
+                  <span class="legend-dot bg-red" style="margin-left: 10px;"></span> Gastos
+                </div>
+              </div>
+              <div class="chart-container">
+                <canvas id="chart-flow"></canvas>
+              </div>
+            </div>
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Gastos por Categoría</h3>
+              </div>
+              <div class="chart-container-donut">
+                <canvas id="chart-categories"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Fila de Cuentas, Tarjetas y Recordatorios Rápidos -->
+          <div class="dashboard-row grid-3">
+            <!-- Cuentas -->
+            <div class="dashboard-card bg-white shadow-sm grid-span-1">
+              <div class="card-header">
+                <h3>Tus Cuentas (Débito)</h3>
+                <span id="total-cuentas-header" style="font-weight: 700; color: var(--color-green); font-size: 1rem; white-space: nowrap; flex-shrink: 0;">S/. 0.00</span>
+              </div>
+              <div class="accounts-list" id="dash-accounts-list">
+                <!-- Se llena con JS -->
+              </div>
+            </div>
+            
+            <!-- Tarjetas de Crédito -->
+            <div class="dashboard-card bg-white shadow-sm grid-span-1">
+              <div class="card-header">
+                <h3>Tarjetas de Crédito</h3>
+                <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                  <span id="total-tarjetas-header" style="font-weight: 700; color: var(--color-red); font-size: 1rem; white-space: nowrap; flex-shrink: 0;">S/. 0.00</span>
+                  <button class="btn-text" id="dash-pay-card-quick" style="display:none; font-size: 0.8rem; padding: 0; flex-shrink: 0;">Pagar</button>
+                </div>
+              </div>
+              <div class="cards-list" id="dash-cards-list">
+                <!-- Se llena con JS -->
+              </div>
+            </div>
+
+            <!-- Recordatorios Rápidos -->
+            <div class="dashboard-card bg-white shadow-sm grid-span-1">
+              <div class="card-header">
+                <h3>Próximos Pagos</h3>
+                <span id="total-recordatorios-header" style="font-weight: 700; color: var(--text-muted); font-size: 1rem; white-space: nowrap; flex-shrink: 0;" title="Pendientes este mes">S/. 0.00</span>
+              </div>
+              <div class="reminders-quick-list" id="dash-reminders-list">
+                <!-- Se llena con JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Últimas Transacciones -->
+          <div class="dashboard-card bg-white shadow-sm recent-transactions-card">
+            <div class="card-header">
+              <h3>Transacciones Recientes</h3>
+              <button class="btn-text view-all-btn" data-target="view-transacciones">Ver todas</button>
+            </div>
+            <div class="table-responsive">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Categoría</th>
+                    <th>Descripción</th>
+                    <th>Origen</th>
+                    <th>Monto</th>
+                  </tr>
+                </thead>
+                <tbody id="dash-transactions-body">
+                  <!-- Se llena con JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: TRANSACCIONES (HISTORIAL COMPLETO) -->
+        <section id="view-transacciones" class="app-view">
+          <div class="dashboard-card bg-white shadow-sm">
+            <div class="card-header-filters">
+              <div class="filter-search-group">
+                <input type="text" id="tx-search" class="form-control" placeholder="Buscar por descripción...">
+                <select id="tx-filter-tipo" class="form-control select-control">
+                  <option value="">Todos los tipos</option>
+                  <option value="INGRESO">Ingresos</option>
+                  <option value="GASTO">Gastos</option>
+                </select>
+                <select id="tx-filter-categoria" class="form-control select-control">
+                  <option value="">Todas las categorías</option>
+                  <!-- Dinámico -->
+                </select>
+                <select id="tx-filter-cuenta" class="form-control select-control">
+                  <option value="">Todas las cuentas/tarjetas</option>
+                  <!-- Dinámico -->
+                </select>
+              </div>
+              <button class="btn btn-secondary" id="btn-exportar-csv">
+                <i data-lucide="download"></i> Exportar CSV
+              </button>
+            </div>
+            
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th class="sortable-header" data-sort="fecha">Fecha <span class="sort-icon" data-sort="fecha"></span></th>
+                    <th>Tipo</th>
+                    <th class="sortable-header" data-sort="categoria">Categoría <span class="sort-icon" data-sort="categoria"></span></th>
+                    <th>Descripción</th>
+                    <th class="sortable-header" data-sort="cuenta">Cuenta / Tarjeta <span class="sort-icon" data-sort="cuenta"></span></th>
+                    <th>Fijo/Variable</th>
+                    <th class="sortable-header" data-sort="monto">Monto <span class="sort-icon" data-sort="monto"></span></th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="tx-table-body">
+                  <!-- JS -->
+                </tbody>
+              </table>
+            </div>
+            
+            <!-- Paginación -->
+            <div class="pagination-container">
+              <span class="pagination-info" id="tx-pagination-info">Mostrando 0 de 0 registros</span>
+              <div class="pagination-buttons">
+                <button class="btn btn-icon" id="btn-prev-page" title="Página Anterior">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-left"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <button class="btn btn-icon" id="btn-next-page" title="Página Siguiente">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: PRESUPUESTOS -->
+        <section id="view-presupuestos" class="app-view">
+          <div class="grid-2">
+            <!-- Listado y Progreso -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Límites Mensuales por Categoría</h3>
+              </div>
+              <div class="budgets-progress-list" id="budgets-list-container">
+                <!-- Dinámico -->
+              </div>
+            </div>
+            
+            <!-- Formulario Ajuste -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Establecer Límite de Presupuesto</h3>
+              </div>
+              <form id="form-presupuesto" class="budget-form">
+                <div class="form-group">
+                  <label for="budget-category">Categoría</label>
+                  <select id="budget-category" class="form-control" required>
+                    <option value="Comida">Comida</option>
+                    <option value="Transporte">Transporte</option>
+                    <option value="Servicios">Servicios</option>
+                    <option value="Vivienda">Vivienda</option>
+                    <option value="Educación">Educación</option>
+                    <option value="Entretenimiento">Entretenimiento</option>
+                    <option value="Otros">Otros</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="budget-amount">Monto Límite Mensual (S/.)</label>
+                  <input type="number" id="budget-amount" step="0.01" min="0" class="form-control" placeholder="Ej. 500" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Guardar Presupuesto</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: RECORDATORIOS -->
+        <section id="view-recordatorios" class="app-view">
+          <div class="grid-2">
+            <!-- Lista Completa de Recordatorios -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Vencimientos y Servicios Pendientes</h3>
+              </div>
+              <div class="reminders-full-list" id="reminders-full-container">
+                <!-- Dinámico -->
+              </div>
+            </div>
+
+            <!-- Nuevo Recordatorio -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Nuevo Recordatorio de Pago</h3>
+              </div>
+              <form id="form-recordatorio" class="reminder-form">
+                <div class="form-group">
+                  <label for="rem-nombre">Nombre del Servicio / Tarjeta</label>
+                  <input type="text" id="rem-nombre" class="form-control" placeholder="Ej. Luz Enel o Tarjeta Visa" required>
+                </div>
+                <div class="form-group">
+                  <label for="rem-monto">Monto Estimado (S/.)</label>
+                  <input type="number" id="rem-monto" step="0.01" min="0" class="form-control" placeholder="Ej. 100 (0 si es variable)">
+                </div>
+                <div class="form-group">
+                  <label for="rem-fecha">Fecha del Próximo Vencimiento</label>
+                  <input type="date" id="rem-fecha" class="form-control" required>
+                </div>
+                <div class="form-group">
+                  <label for="rem-tipo">Tipo de Pago</label>
+                  <select id="rem-tipo" class="form-control" required>
+                    <option value="Servicio">Servicio Público / Suscripción</option>
+                    <option value="Tarjeta">Tarjeta de Crédito</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Añadir Recordatorio</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: METAS (AHORROS) -->
+        <section id="view-ahorros" class="app-view">
+          <div class="grid-3" id="savings-goals-grid">
+            <!-- Tarjetas dinámicas se insertan aquí -->
+          </div>
+          
+          <div class="grid-2" style="margin-top: 30px;">
+            <!-- Nueva Meta -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Nueva Meta de Ahorro</h3>
+              </div>
+              <form id="form-meta" class="savings-form">
+                <div class="form-group">
+                  <label for="goal-nombre">Nombre de la Meta</label>
+                  <input type="text" id="goal-nombre" class="form-control" placeholder="Ej. Vacaciones 2026" required>
+                </div>
+                <div class="form-group">
+                  <label for="goal-objetivo">Monto Objetivo (S/.)</label>
+                  <input type="number" id="goal-objetivo" min="1" step="0.01" class="form-control" placeholder="Ej. 5000" required>
+                </div>
+                <div class="form-group">
+                  <label for="goal-actual">Ahorro Inicial (S/.)</label>
+                  <input type="number" id="goal-actual" min="0" step="0.01" class="form-control" value="0">
+                </div>
+                <div class="form-group">
+                  <label for="goal-fecha">Fecha Límite</label>
+                  <input type="date" id="goal-fecha" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Crear Meta</button>
+              </form>
+            </div>
+            
+            <!-- Historial / Explicación del Ahorro -->
+            <div class="dashboard-card bg-white shadow-sm info-savings-card">
+              <div class="card-header">
+                <h3>Cómo Funciona el Ahorro</h3>
+              </div>
+              <div class="info-savings-content">
+                <p>Las metas de ahorro te ayudan a separar fondos para proyectos específicos de forma virtual. Tu dinero sigue en tus cuentas de débito físicas, pero en el sistema queda "reservado".</p>
+                <div class="tip-box">
+                  <div class="tip-icon"><i data-lucide="lightbulb"></i></div>
+                  <div class="tip-text">Alimentar tus metas frecuentemente te permite ver el porcentaje real que te separa de tus sueños. ¡Registra tus aportes desde las tarjetas de arriba!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: POR COBRAR (FREELANCE) -->
+        <section id="view-por-cobrar" class="app-view">
+          <div class="metrics-grid" style="grid-template-columns: 1fr; margin-bottom: 25px;">
+            <div class="metric-card bg-white shadow-sm" style="border-left: 5px solid var(--color-blue);">
+              <div class="metric-header">
+                <span class="metric-title">Total Pendiente por Cobrar</span>
+                <span class="metric-icon color-blue bg-blue-light"><i data-lucide="clock"></i></span>
+              </div>
+              <h2 class="metric-value text-blue" id="val-total-por-cobrar">S/. 0.00</h2>
+              <p class="metric-subtext text-muted">Ingresos futuros proyectados de trabajos freelance ya realizados</p>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <!-- Listado y Toggle de Trabajos -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 15px;">
+                <h3 id="por-cobrar-title" style="font-size: 1.15em;">Trabajos Registrados</h3>
+                <div class="tab-pill-container" style="display: flex; gap: 8px; background: #f3f4f6; padding: 4px; border-radius: 8px;">
+                  <button type="button" class="btn-tab-pill active" id="tab-jobs-pending" style="border:none; padding: 4px 10px; font-size: 0.85em; border-radius: 6px; font-weight:600; cursor:pointer; background: #ffffff; color: var(--text-main); transition: all 0.2s;">Pendientes</button>
+                  <button type="button" class="btn-tab-pill" id="tab-jobs-collected" style="border:none; padding: 4px 10px; font-size: 0.85em; border-radius: 6px; font-weight:600; cursor:pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Cobrados</button>
+                </div>
+              </div>
+              
+              <!-- Listado de trabajos pendientes -->
+              <div id="list-jobs-pending" class="jobs-list" style="display: flex; flex-direction: column; gap: 15px;">
+                <!-- Rellenado dinámicamente con JS -->
+              </div>
+              
+              <!-- Listado de trabajos cobrados -->
+              <div id="list-jobs-collected" class="jobs-list" style="display: none; flex-direction: column; gap: 15px;">
+                <!-- Rellenado dinámicamente con JS -->
+              </div>
+            </div>
+
+            <!-- Registrar Nuevo Trabajo -->
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Registrar Trabajo Realizado</h3>
+              </div>
+              <form id="form-trabajo-por-cobrar" class="budget-form">
+                <div class="form-group">
+                  <label for="job-cliente">Cliente</label>
+                  <input type="text" id="job-cliente" class="form-control" placeholder="Ej. Cineplanet, BBVA, Fotografía de Boda..." required>
+                </div>
+                <div class="form-group">
+                  <label for="job-descripcion">Detalle o Concepto del Trabajo</label>
+                  <input type="text" id="job-descripcion" class="form-control" placeholder="Ej. Spot publicitario, Cobertura de evento..." required>
+                </div>
+                <div class="form-group">
+                  <label for="job-monto">Monto a Facturar / Cobrar (S/.)</label>
+                  <input type="number" id="job-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 1200.00" required>
+                </div>
+                <div class="form-group">
+                  <label for="job-fecha">Fecha del Servicio Realizado</label>
+                  <input type="date" id="job-fecha" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 15px;">Registrar Trabajo por Cobrar</button>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <!-- VISTA: CONFIGURACIÓN -->
+        <section id="view-configuracion" class="app-view">
+          <div class="grid-2">
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Ajustes Generales</h3>
+              </div>
+              <form id="form-configuracion" class="config-form">
+                <div class="form-group">
+                  <label for="conf-nombre-usuario">Nombre de Usuario</label>
+                  <input type="text" id="conf-nombre-usuario" class="form-control" placeholder="Ej. Jano" required>
+                </div>
+                <div class="form-group">
+                  <label for="conf-moneda">Símbolo de Moneda</label>
+                  <input type="text" id="conf-moneda" class="form-control" value="S/." required>
+                </div>
+                <div class="form-group">
+                  <label for="conf-formato">Formato de Fecha</label>
+                  <select id="conf-formato" class="form-control">
+                    <option value="DD/MM/YYYY">DD/MM/YYYY (Ej. 28/05/2026)</option>
+                    <option value="YYYY-MM-DD">YYYY-MM-DD (Ej. 2026-05-28)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="conf-tc-usd">Tipo de Cambio USD/PEN</label>
+                  <input type="number" id="conf-tc-usd" step="0.01" min="1" class="form-control" placeholder="Ej. 3.80" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+              </form>
+            </div>
+
+            <div class="dashboard-card bg-white shadow-sm">
+              <div class="card-header">
+                <h3>Gestión de la Base de Datos</h3>
+              </div>
+              <div class="db-management-content">
+                <p class="text-muted">Tus datos están guardados localmente de forma segura en: <code>/Finanzas/datos.json</code>.</p>
+                
+                <div class="backup-actions" style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="btn btn-secondary" id="btn-export-backup" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <i data-lucide="download" style="width: 16px; height: 16px;"></i> Exportar Backup Completo
+                  </button>
+                  <button class="btn btn-secondary" id="btn-import-backup-trigger" style="display: inline-flex; align-items: center; gap: 8px;">
+                    <i data-lucide="upload" style="width: 16px; height: 16px;"></i> Importar Backup (JSON)
+                  </button>
+                  <input type="file" id="input-import-backup" accept=".json" style="display: none;">
+                </div>
+
+                <div class="danger-zone" style="margin-top: 30px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                  <h4>Reiniciar datos</h4>
+                  <p class="text-muted" style="font-size: 0.9em; margin-bottom: 15px;">Esto eliminará todas las transacciones históricas migradas y reestablecerá los valores a cero. Cuidado.</p>
+                  <button class="btn btn-danger" id="btn-reset-db">Restaurar Base de Datos</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECCIÓN: CATEGORÍAS PERSONALIZADAS -->
+          <div class="dashboard-card bg-white shadow-sm" style="margin-top: 24px;">
+            <div class="card-header">
+              <h3>🎨 Categorías de Gastos</h3>
+            </div>
+            <div class="categories-config-content">
+              <p class="text-muted" style="font-size: 0.9em; margin-bottom: 15px;">Administra las categorías disponibles para tus transacciones. Puedes agregar nuevas o eliminar las creadas por ti.</p>
+              
+              <!-- Formulario para Agregar Categoría -->
+              <form id="form-agregar-categoria" style="display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+                <div class="form-group" style="flex: 2; min-width: 150px; margin-bottom: 0;">
+                  <label for="cat-nuevo-nombre" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Nombre de la Categoría</label>
+                  <input type="text" id="cat-nuevo-nombre" class="form-control" placeholder="Ej. Regalos, Salud" required style="width: 100%;">
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                  <label for="cat-nuevo-color" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Color / Estilo</label>
+                  <select id="cat-nuevo-color" class="form-control" style="width: 100%;">
+                    <option value="verde">Verde (Esmeralda)</option>
+                    <option value="dorado">Dorado (Ámbar)</option>
+                    <option value="azul">Azul (Classic)</option>
+                    <option value="rojo">Rojo (Coral)</option>
+                    <option value="purpura">Púrpura (Premium)</option>
+                    <option value="teal">Teal (Menta)</option>
+                    <option value="rosado">Rosado (Ahorro)</option>
+                    <option value="indigo">Índigo (Branding)</option>
+                    <option value="gris">Gris (Neutral)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="flex: 1; min-width: 120px; margin-bottom: 0;">
+                  <label for="cat-nuevo-icono" style="font-size: 0.82rem; font-weight: 600; color: var(--text-main);">Ícono</label>
+                  <select id="cat-nuevo-icono" class="form-control" style="width: 100%;">
+                    <option value="help-circle">Interrogación</option>
+                    <option value="shopping-cart">Carrito / Compras</option>
+                    <option value="heart-pulse">Salud / Médico</option>
+                    <option value="dumbbell">Gimnasio / Deportes</option>
+                    <option value="gift">Regalos / Detalle</option>
+                    <option value="shirt">Ropa / Moda</option>
+                    <option value="book-open">Libros / Estudios</option>
+                    <option value="utensils">Comida / Menú</option>
+                    <option value="car">Transporte / Viajes</option>
+                    <option value="home">Vivienda / Hogar</option>
+                    <option value="lightbulb">Servicios / Recibos</option>
+                    <option value="party-popper">Diversión / Fiestas</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="height: 42px;">Agregar Categoría</button>
+              </form>
+
+              <!-- Lista de Categorías Existentes -->
+              <div id="config-categories-list" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 15px;">
+                <!-- Se llena con JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- NUEVA SECCIÓN DE ASISTENTE IA -->
+          <div class="dashboard-card bg-white shadow-sm" style="margin-top: 24px;">
+            <div class="card-header">
+              <h3>🤖 Conexión con Moni Asistente Inteligente (Gemini API)</h3>
+            </div>
+            <div class="config-gemini-content">
+              <p class="text-muted" style="font-size: 0.9em; margin-bottom: 15px;">Conecta la aplicación con Gemini AI para habilitar el entendimiento conversacional completo, realizar consultas avanzadas y hacer preguntas sobre tu dinero.</p>
+              <div class="form-group">
+                <label for="conf-gemini-key" style="font-weight:600; font-size:0.88em; color:var(--text-main); display:block; margin-bottom:6px;">GEMINI API KEY (Google AI Studio)</label>
+                <div style="display:flex; gap:10px; margin-top:5px;">
+                  <input type="text" id="conf-gemini-key" class="form-control" placeholder="Introduce tu clave..." style="flex-grow:1; -webkit-text-security: disc; text-security: disc;">
+                  <button class="btn btn-secondary" id="btn-toggle-key-visibility" type="button" style="padding:0 12px; height:42px;"><i data-lucide="eye" style="width:16px; height:16px;"></i></button>
+                </div>
+                <small class="text-muted" style="display:block; margin-top:5px; font-size:0.8em; line-height:1.4;">Tu clave se guarda únicamente de forma local en tu navegador (localStorage) y se envía temporalmente en las peticiones para procesar comandos. Jamás se guarda en el servidor.</small>
+              </div>
+              <button class="btn btn-primary" id="btn-save-gemini-key" style="margin-top: 15px;">Activar Moni Asistente IA</button>
+            </div>
+          </div>
+        </section>
+        
+        <!-- VISTA: REPORTES DINÁMICOS -->
+        <section id="view-reportes" class="app-view">
+          <div class="view-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom: 25px;">
+            <div>
+              <h2>Reportes Financieros</h2>
+              <p class="text-muted">Generación dinámica de análisis mensual y reportes de rendimiento.</p>
+            </div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="report-month-select" class="form-control" style="width:180px; height:38px;">
+                <!-- Rellenado dinámicamente con JS -->
+              </select>
+              <button class="btn btn-primary" id="btn-generate-report" style="height:38px; display:flex; align-items:center; gap:6px;">
+                <i data-lucide="refresh-cw" style="width:16px; height:16px;"></i> Generar
+              </button>
+            </div>
+          </div>
+
+          <div class="glass-card" style="margin-top:20px; padding:25px;" id="report-view-container">
+            <div style="text-align:center; padding:40px;" class="text-muted">
+              <i data-lucide="file-text" style="width:48px; height:48px; margin-bottom:15px; stroke-width:1.5;"></i>
+              <p>Selecciona un mes y haz clic en "Generar" para compilar tu reporte de rendimiento financiero.</p>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== MODALES ==================== -->
+  
+  <!-- MODAL: NUEVA TRANSACCIÓN -->
+  <div class="modal" id="modal-transaccion">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="modal-title">Registrar Transacción</h3>
+        <button class="modal-close" id="btn-close-modal-tx"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-transaccion">
+        <div class="form-row grid-2">
+          <div class="form-group">
+            <label for="tx-tipo">Tipo</label>
+            <select id="tx-tipo" class="form-control" required>
+              <option value="GASTO">Gasto</option>
+              <option value="INGRESO">Ingreso</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tx-fecha">Fecha</label>
+            <input type="date" id="tx-fecha" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-row grid-2">
+          <div class="form-group">
+            <label for="tx-monto">Monto (S/.)</label>
+            <input type="number" id="tx-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 45.50" required>
+          </div>
+          <div class="form-group">
+            <label for="tx-categoria">Categoría</label>
+            <select id="tx-categoria" class="form-control" required>
+              <!-- Se llena dinámicamente con JS -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Origen del Dinero -->
+        <div class="form-group" id="tx-origen-group">
+          <label id="tx-origen-label" for="tx-origen">¿Con qué cuenta o tarjeta?</label>
+          <select id="tx-origen" class="form-control">
+            <!-- Rellenar dinámicamente con Cuentas y Tarjetas -->
+          </select>
+        </div>
+
+        <div class="form-row grid-2">
+          <div class="form-group">
+            <label for="tx-fijo">Tipo de Gasto</label>
+            <select id="tx-fijo" class="form-control">
+              <option value="Variable">Variable</option>
+              <option value="Fijo">Fijo (Obligatorio/Mensual)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="tx-descripcion">Descripción / Detalle</label>
+            <input type="text" id="tx-descripcion" class="form-control" placeholder="Ej. Almuerzo menú, Taxi, etc." required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Registrar Movimiento</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: TRANSFERENCIA ENTRE CUENTAS -->
+  <div class="modal" id="modal-transferencia">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Transferencia entre Cuentas</h3>
+        <button class="modal-close" id="btn-close-modal-transf"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-transferencia-modal">
+        <div class="form-group">
+          <label for="transf-fecha">Fecha</label>
+          <input type="date" id="transf-fecha" class="form-control" required>
+        </div>
+        <div class="form-row grid-2">
+          <div class="form-group">
+            <label for="transf-origen">Cuenta de Origen</label>
+            <select id="transf-origen" class="form-control" required>
+              <!-- JS -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="transf-destino">Cuenta de Destino</label>
+            <select id="transf-destino" class="form-control" required>
+              <!-- JS -->
+            </select>
+          </div>
+        </div>
+        <div class="form-row grid-2">
+          <div class="form-group">
+            <label for="transf-monto">Monto a Transferir (S/.)</label>
+            <input type="number" id="transf-monto" step="0.01" min="0.01" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="transf-desc">Descripción (Opcional)</label>
+            <input type="text" id="transf-desc" class="form-control" placeholder="Ej. Traspaso de saldo">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Ejecutar Transferencia</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: APORTE A META DE AHORRO -->
+  <div class="modal" id="modal-ahorro-aporte">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 id="ahorro-aporte-title">Aportar a Meta</h3>
+        <button class="modal-close" id="btn-close-modal-aporte"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-ahorro-aporte">
+        <input type="hidden" id="aporte-meta-id">
+        <div class="form-group">
+          <label for="aporte-tipo">Operación</label>
+          <select id="aporte-tipo" class="form-control">
+            <option value="APORTE">Aportar (Incrementar Ahorro)</option>
+            <option value="RETIRO">Retirar (Reducir Ahorro)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="aporte-monto">Monto (S/.)</label>
+          <input type="number" id="aporte-monto" step="0.01" min="0.01" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="aporte-cuenta">¿De qué cuenta debitar/acreditar?</label>
+          <select id="aporte-cuenta" class="form-control" required>
+            <!-- JS -->
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Confirmar Movimiento</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR PAGO DE RECORDATORIO -->
+  <div class="modal" id="modal-pagar-recordatorio">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Registrar Pago</h3>
+        <button class="modal-close" id="btn-close-modal-pay-rem"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-pagar-recordatorio">
+        <input type="hidden" id="pay-rem-id">
+        <div class="form-group">
+          <label>Servicio / Pago</label>
+          <h4 id="pay-rem-name" style="margin-top:5px; font-family:'Outfit'; font-size:1.15em;">Luz</h4>
+        </div>
+        <div class="form-group">
+          <label for="pay-rem-monto">Monto real pagado (S/.)</label>
+          <input type="number" id="pay-rem-monto" step="0.01" min="0.01" class="form-control" required>
+        </div>
+        <div class="form-group" id="pay-rem-origen-container">
+          <label for="pay-rem-cuenta">¿Con qué cuenta debitar?</label>
+          <select id="pay-rem-cuenta" class="form-control" required>
+            <!-- JS -->
+          </select>
+        </div>
+        <div class="form-group" id="pay-rem-tarjeta-container" style="display:none;">
+          <label for="pay-rem-tarjeta">¿Qué tarjeta se está saldando?</label>
+          <select id="pay-rem-tarjeta" class="form-control">
+            <!-- JS -->
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Registrar Pago Completo</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR COBRO DE TRABAJO -->
+  <div class="modal" id="modal-cobrar-trabajo">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>Registrar Cobro de Trabajo</h3>
+        <button class="modal-close" id="btn-close-modal-cobrar"><i data-lucide="x"></i></button>
+      </div>
+      <form id="form-cobrar-trabajo">
+        <input type="hidden" id="cobrar-job-id">
+        <div class="form-group">
+          <label>Cliente / Detalle</label>
+          <h4 id="cobrar-job-title" style="margin-top:5px; font-family:'Outfit'; font-size:1.15em; color:var(--text-main);">Cliente</h4>
+        </div>
+        <div class="form-group">
+          <label for="cobrar-monto-real">Monto real recibido (S/.)</label>
+          <input type="number" id="cobrar-monto-real" step="0.01" min="0.01" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label for="cobrar-cuenta-destino">¿A qué cuenta ingresó el dinero?</label>
+          <select id="cobrar-cuenta-destino" class="form-control" required>
+            <!-- JS -->
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="cobrar-fecha-real">Fecha del Depósito / Transferencia</label>
+          <input type="date" id="cobrar-fecha-real" class="form-control" required>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Registrar Cobro Exitoso</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== BARRA DE COMANDO INTELIGENTE (PALETTE) ==================== -->
+  <div class="command-palette" id="command-palette" style="display: none;">
+    <div class="command-palette-overlay" id="command-overlay"></div>
+    <div class="command-palette-container">
+      <div class="command-input-wrapper">
+        <i data-lucide="sparkles" class="command-icon-input" id="command-terminal-icon"></i>
+        <input type="text" id="command-input" placeholder="Escribe un comando o haz una pregunta... (Ej: 'gasto 50 en comida')" autocomplete="off">
+        <span class="command-esc-badge">ESC</span>
+      </div>
+      
+      <!-- Panel de Respuesta Conversacional (Para respuestas de texto de Gemini) -->
+      <div class="command-chat-response" id="command-chat-response" style="display: none;">
+        <div class="chat-response-header">
+          <span style="display:flex; align-items:center; gap:6px;"><i data-lucide="sparkles" style="color:var(--color-indigo); width:14px; height:14px;"></i> Moni Asistente</span>
+          <button class="btn-text" id="btn-clear-chat" style="font-size:0.75em; padding:0;">Limpiar</button>
+        </div>
+        <div class="chat-response-body" id="command-chat-body">
+          <!-- Respuestas de texto aquí -->
+        </div>
+      </div>
+      
+      <!-- Panel de Previsualización de Acción (Local) -->
+      <div class="command-preview-panel" id="command-preview-panel" style="display: none;">
+        <div class="preview-header">ACCION DETECTADA</div>
+        <div class="preview-content" id="command-preview-content">
+          <!-- Contenido dinámico local o del parseo estructurado de Gemini -->
+        </div>
+      </div>
+      
+      <!-- Sugerencias e Indicador de Modo -->
+      <div class="command-suggestions-panel" id="command-suggestions-panel">
+        <div class="suggestions-section">
+          <div class="suggestions-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Sugerencias rápidas</span>
+            <span id="ai-status-badge" class="ai-status-badge inactive">⚡ Local</span>
+          </div>
+          <div class="suggestions-list" id="command-suggestions-list">
+            <!-- Dinámico -->
+          </div>
+        </div>
+        <div class="suggestions-section keyboard-legend">
+          <span><kbd>Enter</kbd> Ejecutar / Preguntar</span>
+          <span><kbd>↑↓</kbd> Seleccionar sugerencia</span>
+          <span><kbd>Esc</kbd> Cerrar</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

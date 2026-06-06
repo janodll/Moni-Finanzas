@@ -1,0 +1,15 @@
+node_modules/
+npm-cache/
+datos.json
+datos.json.backup
+.DS_Store
+.env
+
+# Reportes personales con datos financieros reales
+reportes/
+
+# Scripts de mantenimiento personal
+scratch/
+
+# Archivos de auditorías de seguridad interna
+AUDITORIA*.md
