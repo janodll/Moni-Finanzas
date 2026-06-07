@@ -58,11 +58,83 @@ export const state = {
   trabajos_pendientes: []
 };
 
+function deduplicateIds() {
+  let wasChanged = false;
+  const seenIds = new Set();
+  
+  if (state.transacciones) {
+    state.transacciones.forEach(t => {
+      if (t.id) seenIds.add(parseInt(t.id));
+    });
+  }
+
+  const getNextId = () => {
+    let maxId = seenIds.size > 0 ? Math.max(...seenIds) : 0;
+    let nextId = maxId + 1;
+    seenIds.add(nextId);
+    return nextId;
+  };
+
+  // 1. Trabajos pendientes / Cuentas por cobrar
+  if (state.trabajos_pendientes) {
+    const jobsSeen = new Set();
+    state.trabajos_pendientes.forEach(j => {
+      const jobId = parseInt(j.id);
+      if (!jobId || jobsSeen.has(jobId) || seenIds.has(jobId)) {
+        j.id = getNextId();
+        wasChanged = true;
+      } else {
+        seenIds.add(jobId);
+      }
+      jobsSeen.add(parseInt(j.id));
+    });
+  }
+
+  // 2. Recordatorios
+  if (state.recordatorios) {
+    const remsSeen = new Set();
+    state.recordatorios.forEach(r => {
+      const remId = parseInt(r.id);
+      if (!remId || remsSeen.has(remId) || seenIds.has(remId)) {
+        r.id = getNextId();
+        wasChanged = true;
+      } else {
+        seenIds.add(remId);
+      }
+      remsSeen.add(parseInt(r.id));
+    });
+  }
+
+  // 3. Metas
+  if (state.metas) {
+    const metasSeen = new Set();
+    state.metas.forEach(m => {
+      const metaId = parseInt(m.id);
+      if (!metaId || metasSeen.has(metaId) || seenIds.has(metaId)) {
+        m.id = getNextId();
+        wasChanged = true;
+      } else {
+        seenIds.add(metaId);
+      }
+      metasSeen.add(parseInt(m.id));
+    });
+  }
+
+  return wasChanged;
+}
+
 export function updateState(newState) {
   Object.keys(state).forEach(key => delete state[key]);
   Object.assign(state, newState);
+  
+  const wasChanged = deduplicateIds();
+
   if (state.categorias) {
     updateCategoryStyles(state.categorias);
+  }
+
+  if (wasChanged) {
+    saveState();
   }
 }
 
