@@ -138,7 +138,12 @@ export function renderDashboardLists(balances) {
       let debtHtml = "";
       if (isCredito) {
         if (solesDebt > 0 && usdDebt > 0) {
-          debtHtml = `<span style="color:var(--color-red); font-weight:700;">${mon} ${formatNumber(solesDebt)}</span> <span style="font-size:0.8em; font-weight:600; color:var(--text-muted); margin:0 3px;">+</span> <span style="color:#2563eb; font-weight:700;">US$ ${formatNumber(usdDebt)}</span>`;
+          debtHtml = `
+            <div style="display:flex; flex-direction:column; align-items:flex-end; line-height:1.2;">
+              <span style="color:var(--color-red); font-weight:700;">${mon} ${formatNumber(solesDebt)}</span>
+              <span style="color:#2563eb; font-weight:700; font-size:0.82em;">US$ ${formatNumber(usdDebt)}</span>
+            </div>
+          `;
         } else if (usdDebt > 0) {
           debtHtml = `<span style="color:#2563eb; font-weight:700;">US$ ${formatNumber(usdDebt)}</span>`;
         } else if (solesDebt > 0) {
