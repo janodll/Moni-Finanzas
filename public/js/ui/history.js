@@ -42,7 +42,7 @@ export function setupFilters() {
   });
 
   // Cabeceras de ordenamiento
-  document.querySelectorAll(".sortable").forEach(header => {
+  document.querySelectorAll(".sortable-header").forEach(header => {
     header.addEventListener("click", () => {
       const field = header.getAttribute("data-sort");
       if (pagination.sortField === field) {

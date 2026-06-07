@@ -1966,3 +1966,28 @@ body {
   color: var(--text-main);
 }
 
+/* ==================== IMPRESIÓN (PRINT MEDIA QUERY) ==================== */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #printable-report, #printable-report * {
+    visibility: visible;
+  }
+  #printable-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #FFF !important;
+    color: #000 !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  /* Ocultar botones de acción en impresión */
+  #btn-print-report, .pagination-buttons, .command-palette {
+    display: none !important;
+  }
+}
+
