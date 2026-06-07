@@ -127,6 +127,69 @@ export function setupCommandPalette() {
 
   if (!palette || !input) return;
 
+  let activeRecognition = null;
+
+  // Configurar micrófono / reconocimiento de voz
+  const micBtn = document.getElementById("command-mic-btn");
+  if (micBtn) {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      micBtn.style.display = "none";
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "es-PE";
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      let isListening = false;
+      activeRecognition = recognition;
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add("listening");
+        input.placeholder = "Escuchando... habla ahora";
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        input.value = transcript;
+        
+        // Simular evento input para refrescar NLP
+        const inputEvent = new Event('input', { bubbles: true });
+        input.dispatchEvent(inputEvent);
+        
+        showToast("Audio Procesado", `Entendido: "${transcript}"`, "success");
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech recognition error:", event.error);
+        if (event.error === 'not-allowed') {
+          showToast("Micrófono desactivado", "Permite el acceso al micrófono en la barra de direcciones.", "error");
+        } else if (event.error !== 'aborted') {
+          showToast("Error de audio", "No se pudo procesar la voz. Inténtalo de nuevo.", "error");
+        }
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove("listening");
+        input.placeholder = "Escribe un comando o haz una pregunta... (Ej: 'gasto 50 en comida')";
+      };
+
+      micBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isListening) {
+          recognition.stop();
+        } else {
+          try {
+            recognition.start();
+          } catch (err) {
+            console.error(err);
+          }
+        }
+      });
+    }
+  }
+
   // Abrir barra de comandos
   const openPalette = () => {
     palette.style.display = "flex";
@@ -156,6 +219,11 @@ export function setupCommandPalette() {
     clearCommandChatHistory();
     document.getElementById("command-chat-body").innerHTML = "";
     document.body.style.overflow = ""; // Reactivar scroll
+    if (activeRecognition) {
+      try {
+        activeRecognition.stop();
+      } catch (err) {}
+    }
   };
 
   // Triggers de Apertura
