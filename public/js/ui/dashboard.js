@@ -1,6 +1,6 @@
 // Renderizado de métricas y gráficos del inicio (Dashboard) de Moni
 
-import { state, CATEGORY_STYLES } from '../state.js';
+import { state, CATEGORY_STYLES, saveState } from '../state.js';
 import { formatNumber, formatDateStr, getCurrentMonthString } from '../calculations.js';
 import { safeCreateIcons } from './components.js';
 
@@ -409,8 +409,13 @@ export function renderBudgets(gastosCategoria) {
     const item = document.createElement("div");
     item.className = "budget-item";
     item.innerHTML = `
-      <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-        <span style="font-weight:600; color:var(--text-main);">${b.categoria}</span>
+      <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-weight:600; color:var(--text-main);">${b.categoria}</span>
+          <button class="btn-delete-budget" data-category="${b.categoria}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:2px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Eliminar presupuesto">
+            <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
+          </button>
+        </div>
         <span style="font-size:0.88em; color:var(--text-muted);">${porcentaje}% (${mon} ${formatNumber(gastado)} / ${formatNumber(b.limite)})</span>
       </div>
       <div class="progress-bar">
@@ -418,6 +423,17 @@ export function renderBudgets(gastosCategoria) {
       </div>
     `;
     container.appendChild(item);
+  });
+
+  // Event listener para eliminar presupuestos
+  container.querySelectorAll(".btn-delete-budget").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const category = e.currentTarget.getAttribute("data-category");
+      if (confirm(`¿Estás seguro de que deseas eliminar el presupuesto de la categoría "${category}"?`)) {
+        state.presupuestos = state.presupuestos.filter(b => b.categoria !== category);
+        saveState();
+      }
+    });
   });
 }
 
@@ -477,9 +493,14 @@ export function renderReminders() {
         </div>
         <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
           <strong style="color:var(--text-main);">${mon} ${formatNumber(r.monto)}</strong>
-          <button class="btn btn-secondary btn-pay-reminder" data-id="${r.id}" style="padding:4px 8px; font-size:0.78em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
-            <i data-lucide="check" style="width:12px; height:12px;"></i> Pagar
-          </button>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <button class="btn btn-secondary btn-pay-reminder" data-id="${r.id}" style="padding:4px 8px; font-size:0.78em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
+              <i data-lucide="check" style="width:12px; height:12px;"></i> Pagar
+            </button>
+            <button class="btn-delete-reminder" data-id="${r.id}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center; width:24px; height:24px;" title="Eliminar recordatorio">
+              <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+            </button>
+          </div>
         </div>
       `;
       container.appendChild(item);
@@ -490,6 +511,19 @@ export function renderReminders() {
       btn.addEventListener("click", (e) => {
         const id = parseInt(e.currentTarget.getAttribute("data-id"));
         openPayReminderModal(id);
+      });
+    });
+
+    // Agregar event listeners a los botones de eliminar
+    container.querySelectorAll(".btn-delete-reminder").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const id = parseInt(e.currentTarget.getAttribute("data-id"));
+        const rem = state.recordatorios.find(r => parseInt(r.id) === id);
+        const remName = rem ? rem.nombre : "este recordatorio";
+        if (confirm(`¿Estás seguro de que deseas eliminar el recordatorio "${remName}"?`)) {
+          state.recordatorios = state.recordatorios.filter(r => parseInt(r.id) !== id);
+          saveState();
+        }
       });
     });
   };
@@ -533,9 +567,12 @@ export function renderSavingsGoals() {
         <span>${mon} ${formatNumber(m.actual)} ahorrado</span>
         <span class="goal-date"><i data-lucide="calendar"></i> Límite: ${formatDateStr(m.fecha_limite, state.configuracion?.formato_fecha)}</span>
       </div>
-      <div class="goal-card-actions">
+      <div class="goal-card-actions" style="display:flex; justify-content:space-between; align-items:center; width:100%;">
         <button class="btn btn-secondary btn-aporte-meta" data-id="${m.id}" style="padding: 4px 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
           <i data-lucide="plus"></i> Aportar
+        </button>
+        <button class="btn-delete-meta" data-id="${m.id}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:4px; display:flex; align-items:center;" title="Eliminar meta">
+          <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
         </button>
       </div>
     `;
@@ -547,6 +584,19 @@ export function renderSavingsGoals() {
     btn.addEventListener("click", (e) => {
       const id = parseInt(e.currentTarget.getAttribute("data-id"));
       openAporteModal(id);
+    });
+  });
+
+  // Event listener para eliminar metas
+  container.querySelectorAll(".btn-delete-meta").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-id"));
+      const meta = state.metas.find(m => parseInt(m.id) === id);
+      const metaName = meta ? meta.nombre : "esta meta";
+      if (confirm(`¿Estás seguro de que deseas eliminar la meta de ahorro "${metaName}"?`)) {
+        state.metas = state.metas.filter(m => parseInt(m.id) !== id);
+        saveState();
+      }
     });
   });
 
@@ -586,9 +636,14 @@ export function renderPorCobrar() {
           </div>
           <div style="text-align: right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
             <div class="job-amount text-orange">${mon} ${formatNumber(job.monto)}</div>
-            <button class="btn btn-secondary btn-cobrar-trabajo" data-id="${job.id}" style="padding:4px 8px; font-size:0.8em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
-              <i data-lucide="check-square" style="width:12px; height:12px;"></i> Registrar Cobro
-            </button>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button class="btn btn-secondary btn-cobrar-trabajo" data-id="${job.id}" style="padding:4px 8px; font-size:0.8em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
+                <i data-lucide="check-square" style="width:12px; height:12px;"></i> Registrar Cobro
+              </button>
+              <button class="btn-delete-job" data-id="${job.id}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:4px; display:flex; align-items:center;" title="Eliminar cobro pendiente">
+                <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -612,7 +667,12 @@ export function renderPorCobrar() {
             <div class="job-client">${job.cliente}</div>
             <div class="text-muted" style="font-size: 0.85em;">${job.descripcion} • Cobrado en: ${ctaNombre} el ${formatDateStr(job.fecha_cobro, state.configuracion?.formato_fecha)}</div>
           </div>
-          <div class="job-amount text-green">${mon} ${formatNumber(job.monto)}</div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div class="job-amount text-green">${mon} ${formatNumber(job.monto)}</div>
+            <button class="btn-delete-job" data-id="${job.id}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:4px; display:flex; align-items:center;" title="Eliminar cobro realizado">
+              <i data-lucide="trash-2" style="width:14px; height:14px;"></i>
+            </button>
+          </div>
         </div>
       `;
       listCollected.appendChild(card);
@@ -628,6 +688,22 @@ export function renderPorCobrar() {
       openCobrarModal(id);
     });
   });
+
+  // Bindear botones de eliminar cobro
+  const deleteJobHandler = (btn) => {
+    btn.addEventListener("click", (e) => {
+      const id = parseInt(e.currentTarget.getAttribute("data-id"));
+      const job = state.trabajos_pendientes.find(j => parseInt(j.id) === id);
+      const clientName = job ? job.cliente : "este cobro";
+      if (confirm(`¿Estás seguro de que deseas eliminar el registro de cobro para "${clientName}"?`)) {
+        state.trabajos_pendientes = state.trabajos_pendientes.filter(j => parseInt(j.id) !== id);
+        saveState();
+      }
+    });
+  };
+
+  listPending.querySelectorAll(".btn-delete-job").forEach(deleteJobHandler);
+  listCollected.querySelectorAll(".btn-delete-job").forEach(deleteJobHandler);
 
   safeCreateIcons();
 }
