@@ -28,6 +28,7 @@ export const DEFAULT_CATEGORY_STYLES = {
   "Pago Tarjeta": { icon: "credit-card", color: "#6366F1", bg: "#EEF2FF" },
   "Transferencia": { icon: "repeat", color: "#6B7280", bg: "#F3F4F6" },
   "Ahorro": { icon: "piggy-bank", color: "#EC4899", bg: "#FCE7F3" },
+  "Mascotas": { icon: "paw-print", color: "#EC4899", bg: "#FCE7F3" },
   "Saldo Inicial": { icon: "wallet", color: "#10B981", bg: "#ECFDF5" },
   "Deuda Inicial": { icon: "shield-alert", color: "#EF4444", bg: "#FFF1F2" },
   "Otros": { icon: "help-circle", color: "#6B7280", bg: "#F3F4F6" }
