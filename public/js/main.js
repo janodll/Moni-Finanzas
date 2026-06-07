@@ -462,8 +462,10 @@ export function setupFormSubmits() {
         return;
       }
 
-      const cOrigNombre = state.cuentas.find(c => c.id === cOrig).nombre;
-      const cDestNombre = state.cuentas.find(c => c.id === cDest).nombre;
+      const cOrigCta = state.cuentas.find(c => parseInt(c.id) === cOrig);
+      const cDestCta = state.cuentas.find(c => parseInt(c.id) === cDest);
+      const cOrigNombre = cOrigCta ? cOrigCta.nombre : "Origen";
+      const cDestNombre = cDestCta ? cDestCta.nombre : "Destino";
 
       const txGasto = {
         id: generateUniqueId(),
@@ -629,14 +631,18 @@ export function setupFormSubmits() {
       const monto = parseFloat(document.getElementById("pay-rem-monto").value);
       const ctaId = parseInt(document.getElementById("pay-rem-cuenta").value);
 
-      const rem = state.recordatorios.find(r => r.id === remId);
-      if (!rem) return;
+      const rem = state.recordatorios.find(r => parseInt(r.id) === remId);
+      if (!rem) {
+        showToast("Error", "No se encontró el recordatorio.", "error");
+        return;
+      }
 
       const todayStr = new Date().toISOString().substring(0, 10);
 
       if (rem.tipo === "Tarjeta") {
         const tarjId = parseInt(document.getElementById("pay-rem-tarjeta").value);
-        const tarjNombre = state.tarjetas.find(t => t.id === tarjId).nombre;
+        const tarj = state.tarjetas.find(t => parseInt(t.id) === tarjId);
+        const tarjNombre = tarj ? tarj.nombre : "Tarjeta";
 
         const txGasto = {
           id: generateUniqueId(),
@@ -658,7 +664,7 @@ export function setupFormSubmits() {
           categoria: "Pago Tarjeta",
           descripcion: `Pago de Tarjeta ${tarjNombre}`,
           monto,
-          tarjeta_id: tarjId,
+          tarjeta_id: tarj ? tarj.id : null,
           cuenta_id: null,
           fijo: "Variable"
         };
