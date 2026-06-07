@@ -138,6 +138,7 @@ export function setupCommandPalette() {
     } else {
       const recognition = new SpeechRecognition();
       recognition.lang = "es-PE";
+      recognition.continuous = false; // Detener después de la primera frase corta
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
       let isListening = false;
