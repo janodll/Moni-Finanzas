@@ -98,7 +98,10 @@ export function renderDashboardLists(balances) {
           const isIngreso = tx.tipo === "INGRESO";
           
           if (desc === "Deuda Inicial") {
-            return;
+            const hasInitialDebtProperty = parseFloat(t.deuda_inicial_soles || 0) !== 0 || parseFloat(t.deuda_inicial_usd || 0) !== 0;
+            if (hasInitialDebtProperty) {
+              return;
+            }
           }
           
           if (isGasto) {
