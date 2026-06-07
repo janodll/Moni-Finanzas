@@ -216,7 +216,14 @@ export async function saveState() {
 }
 
 export function generateUniqueId() {
-  if (state.transacciones.length === 0) return 1;
-  const ids = state.transacciones.map(t => parseInt(t.id) || 0);
-  return Math.max(...ids) + 1;
+  const allIds = [
+    ...state.transacciones,
+    ...(state.recordatorios || []),
+    ...(state.metas || []),
+    ...(state.presupuestos || []),
+    ...(state.trabajos_pendientes || [])
+  ].map(e => parseInt(e.id) || 0);
+
+  if (allIds.length === 0) return 1;
+  return Math.max(...allIds) + 1;
 }

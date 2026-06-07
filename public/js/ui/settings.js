@@ -19,7 +19,7 @@ export function populateConfigForm() {
   const confTcUsd = document.getElementById("conf-tc-usd");
 
   if (confNombre) {
-    confNombre.value = state.configuracion?.nombre_usuario || "Jano";
+    confNombre.value = state.configuracion?.nombre_usuario || "Usuario";
   }
   if (confMoneda && state.configuracion?.moneda) {
     confMoneda.value = state.configuracion.moneda;
