@@ -219,11 +219,11 @@ export function renderDashboardLists(balances) {
 // Obtener etiqueta legible sobre el origen/destino del dinero
 export function getOrigenLabel(tx) {
   if (tx.cuenta_id) {
-    const c = state.cuentas.find(item => item.id === parseInt(tx.cuenta_id));
+    const c = state.cuentas.find(item => parseInt(item.id) === parseInt(tx.cuenta_id));
     return c ? `${c.nombre} (Cta)` : "Cuenta";
   }
   if (tx.tarjeta_id) {
-    const t = state.tarjetas.find(item => item.id === parseInt(tx.tarjeta_id));
+    const t = state.tarjetas.find(item => parseInt(item.id) === parseInt(tx.tarjeta_id));
     return t ? `${t.nombre} (Tarj)` : "Tarjeta";
   }
   return "N/A";
@@ -601,7 +601,7 @@ export function renderPorCobrar() {
     listCollected.innerHTML = `<p class="text-muted" style="text-align: center; padding: 20px;">No tienes cobros registrados históricamente.</p>`;
   } else {
     cobrados.forEach(job => {
-      const cta = state.cuentas.find(c => c.id === job.cuenta_id);
+      const cta = state.cuentas.find(c => parseInt(c.id) === parseInt(job.cuenta_id));
       const ctaNombre = cta ? cta.nombre : "Cuenta";
 
       const card = document.createElement("div");
@@ -634,7 +634,7 @@ export function renderPorCobrar() {
 
 // Abrir modal aporte
 export function openAporteModal(metaId) {
-  const meta = state.metas.find(m => m.id === metaId);
+  const meta = state.metas.find(m => parseInt(m.id) === parseInt(metaId));
   if (!meta) return;
 
   document.getElementById("aporte-meta-id").value = metaId;
@@ -647,7 +647,7 @@ export function openAporteModal(metaId) {
 
 // Abrir modal de pagar recordatorio
 export function openPayReminderModal(remId) {
-  const rem = state.recordatorios.find(r => r.id === remId);
+  const rem = state.recordatorios.find(r => parseInt(r.id) === parseInt(remId));
   if (!rem) return;
 
   document.getElementById("pay-rem-id").value = remId;
@@ -662,7 +662,7 @@ export function openPayReminderModal(remId) {
 
 // Abrir modal registrar cobro freelance
 export function openCobrarModal(id) {
-  const job = state.trabajos_pendientes.find(j => j.id === id);
+  const job = state.trabajos_pendientes.find(j => parseInt(j.id) === parseInt(id));
   if (!job) return;
 
   document.getElementById("cobrar-job-id").value = job.id;

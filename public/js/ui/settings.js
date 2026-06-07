@@ -474,9 +474,9 @@ export function deleteAccount(id) {
     return;
   }
 
-  const c = state.cuentas.find(item => item.id === id);
+  const c = state.cuentas.find(item => parseInt(item.id) === id);
   if (c && confirm(`¿Estás seguro de que deseas eliminar la cuenta "${c.nombre}"?`)) {
-    state.cuentas = state.cuentas.filter(item => item.id !== id);
+    state.cuentas = state.cuentas.filter(item => parseInt(item.id) !== id);
     saveState();
     showToast("Cuenta eliminada", `La cuenta "${c.nombre}" fue eliminada correctamente.`, "success");
   }
@@ -490,9 +490,9 @@ export function deleteCard(id) {
     return;
   }
 
-  const t = state.tarjetas.find(item => item.id === id);
+  const t = state.tarjetas.find(item => parseInt(item.id) === id);
   if (t && confirm(`¿Estás seguro de que deseas eliminar la tarjeta "${t.nombre}"?`)) {
-    state.tarjetas = state.tarjetas.filter(item => item.id !== id);
+    state.tarjetas = state.tarjetas.filter(item => parseInt(item.id) !== id);
     saveState();
     showToast("Tarjeta eliminada", `La tarjeta "${t.nombre}" fue eliminada correctamente.`, "success");
   }

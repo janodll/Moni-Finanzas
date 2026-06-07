@@ -108,9 +108,9 @@ export function filterTransactions() {
     let ctaMatches = true;
     if (cta) {
       if (cta.startsWith("cta-")) {
-        ctaMatches = tx.cuenta_id === parseInt(cta.replace("cta-", ""));
+        ctaMatches = parseInt(tx.cuenta_id) === parseInt(cta.replace("cta-", ""));
       } else if (cta.startsWith("tarj-")) {
-        ctaMatches = tx.tarjeta_id === parseInt(cta.replace("tarj-", ""));
+        ctaMatches = parseInt(tx.tarjeta_id) === parseInt(cta.replace("tarj-", ""));
       }
     }
 
@@ -273,13 +273,13 @@ export function renderTransactionsTable() {
 
 // Eliminar transacción
 export function deleteTransaction(id) {
-  state.transacciones = state.transacciones.filter(tx => tx.id !== id);
+  state.transacciones = state.transacciones.filter(tx => parseInt(tx.id) !== id);
   saveState();
 }
 
 // Abrir modal de edición
 export function openEditTransactionModal(id) {
-  const tx = state.transacciones.find(t => t.id === id);
+  const tx = state.transacciones.find(t => parseInt(t.id) === id);
   if (!tx) {
     console.error("Transacción no encontrada:", id);
     return;
