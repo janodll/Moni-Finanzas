@@ -96,5 +96,9 @@ REGLAS DE PROCESAMIENTO:
      }
    }
 
+4. RESOLUCIÓN DE PREGUNTAS ACLARATORIAS (MULTI-TURNO):
+   - Si en el historial de conversación (history) tú hiciste una pregunta aclaratoria (ej. "¿Con qué cuenta pagaste?", "¿Qué monto?", etc.) y el usuario responde en su último turno con un dato simple (ej. "Efectivo", "50", "la tarjeta VISA"), debes interpretar esa respuesta como el parámetro faltante para la acción que se estaba intentando registrar en el primer turno del historial.
+   - En este caso, debes combinar la información de los turnos previos (ej. "Compré una coca cola a 5 soles") y el último turno (ej. "Efectivo") para generar un comando de acción completo ("type": "action") registrando la transacción con todos los parámetros correctos. NUNCA respondas con una consulta general o saldo en este caso.
+
  CRITICAL: Retorna ÚNICAMENTE un objeto JSON válido sin bloques de código \`\`\`json o explicaciones.`;
 }

@@ -423,108 +423,123 @@ export function renderBudgets(gastosCategoria) {
 
 // Renderiza los próximos pagos y recordatorios
 export function renderReminders() {
-  const container = document.getElementById("reminders-list");
-  const totalRemPending = document.getElementById("total-reminders-header");
-  if (!container) return;
-
-  container.innerHTML = "";
   const mon = state.configuracion.moneda || "S/.";
+  const pendientes = state.recordatorios.filter(r => r.estado === "Pendiente");
+  
+  // Ordenar por fecha de vencimiento ascendente
+  pendientes.sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento));
 
-  // Calcular la suma de recordatorios pendientes del mes actual
-  const currentMonthStr = getCurrentMonthString();
+  // Calcular la suma de recordatorios pendientes
   let sumaRecordatoriosPendientes = 0;
-
-  state.recordatorios.forEach(r => {
-    if (r.estado === "Pendiente") {
-      sumaRecordatoriosPendientes += parseFloat(r.monto) || 0;
-    }
+  pendientes.forEach(r => {
+    sumaRecordatoriosPendientes += parseFloat(r.monto) || 0;
   });
 
+  // 1. Encabezado de total en el dashboard Resumen
+  const totalRemPendingHeader = document.getElementById("total-recordatorios-header");
+  if (totalRemPendingHeader) {
+    totalRemPendingHeader.innerText = `${mon} ${formatNumber(sumaRecordatoriosPendientes)}`;
+  }
+
+  // 2. Encabezado de total en la vista completa
+  const totalRemPending = document.getElementById("total-reminders-header");
   if (totalRemPending) {
     totalRemPending.innerText = `${mon} ${formatNumber(sumaRecordatoriosPendientes)}`;
   }
 
-  const pendientes = state.recordatorios.filter(r => r.estado === "Pendiente");
+  const renderList = (containerId) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
 
-  if (pendientes.length === 0) {
-    container.innerHTML = `<p class="text-muted" style="text-align: center; margin: 15px 0;">No tienes recordatorios pendientes.</p>`;
-    return;
-  }
+    container.innerHTML = "";
 
-  // Ordenar por fecha de vencimiento ascendente
-  pendientes.sort((a, b) => a.fecha_vencimiento.localeCompare(b.fecha_vencimiento));
+    if (pendientes.length === 0) {
+      container.innerHTML = `<p class="text-muted" style="text-align: center; margin: 15px 0; padding: 10px;">No tienes recordatorios pendientes.</p>`;
+      return;
+    }
 
-  pendientes.forEach(r => {
-    const item = document.createElement("div");
-    item.className = "reminder-item";
-    
-    const isTarjeta = r.tipo === "Tarjeta";
-    const iconName = isTarjeta ? "credit-card" : "lightbulb";
+    pendientes.forEach(r => {
+      const item = document.createElement("div");
+      item.className = "reminder-item";
+      
+      const isTarjeta = r.tipo === "Tarjeta";
+      const iconName = isTarjeta ? "credit-card" : "lightbulb";
 
-    item.innerHTML = `
-      <div style="display:flex; align-items:center; gap:12px;">
-        <span class="category-badge-icon" style="background-color:${isTarjeta ? 'var(--color-blue-light)' : 'var(--color-red-light)'}; color:${isTarjeta ? 'var(--color-blue)' : 'var(--color-red)'}; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px;">
-          <i data-lucide="${iconName}" style="width:16px; height:16px;"></i>
-        </span>
-        <div>
-          <div style="font-weight:600; color:var(--text-main);">${r.nombre}</div>
-          <small class="text-muted">Vence: ${formatDateStr(r.fecha_vencimiento, state.configuracion?.formato_fecha)}</small>
+      item.innerHTML = `
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="category-badge-icon" style="background-color:${isTarjeta ? 'var(--color-blue-light)' : 'var(--color-red-light)'}; color:${isTarjeta ? 'var(--color-blue)' : 'var(--color-red)'}; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:8px;">
+            <i data-lucide="${iconName}" style="width:16px; height:16px;"></i>
+          </span>
+          <div>
+            <div style="font-weight:600; color:var(--text-main);">${r.nombre}</div>
+            <small class="text-muted">Vence: ${formatDateStr(r.fecha_vencimiento, state.configuracion?.formato_fecha)}</small>
+          </div>
         </div>
-      </div>
-      <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
-        <strong style="color:var(--text-main);">${mon} ${formatNumber(r.monto)}</strong>
-        <button class="btn btn-secondary btn-pay-reminder" data-id="${r.id}" style="padding:4px 8px; font-size:0.78em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
-          <i data-lucide="check" style="width:12px; height:12px;"></i> Pagar
-        </button>
-      </div>
-    `;
-    container.appendChild(item);
-  });
-
-  // Event listener para pagar recordatorio
-  container.querySelectorAll(".btn-pay-reminder").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      const id = parseInt(e.currentTarget.getAttribute("data-id"));
-      openPayReminderModal(id);
+        <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <strong style="color:var(--text-main);">${mon} ${formatNumber(r.monto)}</strong>
+          <button class="btn btn-secondary btn-pay-reminder" data-id="${r.id}" style="padding:4px 8px; font-size:0.78em; height:24px; border-radius:6px; display:flex; align-items:center; gap:4px;">
+            <i data-lucide="check" style="width:12px; height:12px;"></i> Pagar
+          </button>
+        </div>
+      `;
+      container.appendChild(item);
     });
-  });
+
+    // Agregar event listeners a los botones de pagar
+    container.querySelectorAll(".btn-pay-reminder").forEach(btn => {
+      btn.addEventListener("click", (e) => {
+        const id = parseInt(e.currentTarget.getAttribute("data-id"));
+        openPayReminderModal(id);
+      });
+    });
+  };
+
+  // Renderizar en ambos contenedores
+  renderList("reminders-full-container");
+  renderList("dash-reminders-list");
 
   safeCreateIcons();
 }
 
 // Renderiza las metas de ahorro
 export function renderSavingsGoals() {
-  const container = document.getElementById("savings-list");
+  const container = document.getElementById("savings-goals-grid");
   if (!container) return;
 
   container.innerHTML = "";
   const mon = state.configuracion.moneda || "S/.";
 
   if (state.metas.length === 0) {
-    container.innerHTML = `<p class="text-muted" style="text-align: center; margin: 15px 0;">No tienes metas de ahorro configuradas.</p>`;
+    container.innerHTML = `<p class="text-muted" style="text-align: center; grid-column: 1 / -1; margin: 15px 0;">No tienes metas de ahorro configuradas.</p>`;
     return;
   }
 
   state.metas.forEach(m => {
     const progreso = Math.min(100, Math.round((m.actual / m.objetivo) * 100));
-    const item = document.createElement("div");
-    item.className = "savings-item";
-    item.innerHTML = `
-      <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
-        <span style="font-weight:600; color:var(--text-main);">${m.nombre}</span>
-        <span style="font-size:0.85em; color:var(--text-muted);">${progreso}% (${mon} ${formatNumber(m.actual)} / ${formatNumber(m.objetivo)})</span>
+    const card = document.createElement("div");
+    card.className = "savings-goal-card";
+    card.innerHTML = `
+      <div class="goal-card-header">
+        <span class="goal-card-title">${m.nombre}</span>
+        <span class="goal-card-target" style="font-weight:700; color:var(--color-indigo);">${mon} ${formatNumber(m.objetivo)}</span>
       </div>
-      <div class="progress-bar" style="margin-bottom:8px;">
-        <div class="progress-fill progress-blue" style="width: ${progreso}%"></div>
+      <div class="goal-card-progress">
+        <div class="progress-bar goal-progress-bar">
+          <div class="progress-fill progress-blue" style="width: ${progreso}%"></div>
+        </div>
+        <span class="goal-percent-text">${progreso}%</span>
       </div>
-      <div style="display:flex; justify-content:space-between; align-items:center;">
-        <small class="text-muted">Meta: ${formatDateStr(m.fecha_limite, state.configuracion?.formato_fecha)}</small>
-        <button class="btn btn-secondary btn-aporte-meta" data-id="${m.id}" style="padding:2px 6px; font-size:0.75em; height:22px; border-radius:6px; display:flex; align-items:center; gap:2px;">
-          <i data-lucide="plus" style="width:10px; height:10px;"></i> Gestionar
+      <div class="goal-details">
+        <span>${mon} ${formatNumber(m.actual)} ahorrado</span>
+        <span class="goal-date"><i data-lucide="calendar"></i> Límite: ${formatDateStr(m.fecha_limite, state.configuracion?.formato_fecha)}</span>
+      </div>
+      <div class="goal-card-actions">
+        <button class="btn btn-secondary btn-aporte-meta" data-id="${m.id}" style="padding: 4px 10px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
+          <i data-lucide="plus"></i> Aportar
         </button>
       </div>
     `;
-    container.appendChild(item);
+    container.appendChild(card);
   });
 
   // Event listener para aportar a metas

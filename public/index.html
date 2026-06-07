@@ -335,13 +335,7 @@
                 <div class="form-group">
                   <label for="budget-category">Categoría</label>
                   <select id="budget-category" class="form-control" required>
-                    <option value="Comida">Comida</option>
-                    <option value="Transporte">Transporte</option>
-                    <option value="Servicios">Servicios</option>
-                    <option value="Vivienda">Vivienda</option>
-                    <option value="Educación">Educación</option>
-                    <option value="Entretenimiento">Entretenimiento</option>
-                    <option value="Otros">Otros</option>
+                    <!-- Se llena dinámicamente con JS -->
                   </select>
                 </div>
                 <div class="form-group">
@@ -447,7 +441,7 @@
           </div>
         </section>
 
-        <!-- VISTA: POR COBRAR (FREELANCE) -->
+        <!-- VISTA: POR COBRAR (CUENTAS POR COBRAR) -->
         <section id="view-por-cobrar" class="app-view">
           <div class="metrics-grid" style="grid-template-columns: 1fr; margin-bottom: 25px;">
             <div class="metric-card bg-white shadow-sm" style="border-left: 5px solid var(--color-blue);">
@@ -456,7 +450,7 @@
                 <span class="metric-icon color-blue bg-blue-light"><i data-lucide="clock"></i></span>
               </div>
               <h2 class="metric-value text-blue" id="val-total-por-cobrar">S/. 0.00</h2>
-              <p class="metric-subtext text-muted">Ingresos futuros proyectados de trabajos freelance ya realizados</p>
+              <p class="metric-subtext text-muted">Dinero prestado, facturado o pendiente de cobrar a otras personas o entidades</p>
             </div>
           </div>
 
@@ -464,7 +458,7 @@
             <!-- Listado y Toggle de Trabajos -->
             <div class="dashboard-card bg-white shadow-sm">
               <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 15px;">
-                <h3 id="por-cobrar-title" style="font-size: 1.15em;">Trabajos Registrados</h3>
+                <h3 id="por-cobrar-title" style="font-size: 1.15em;">Cobros Registrados</h3>
                 <div class="tab-pill-container" style="display: flex; gap: 8px; background: #f3f4f6; padding: 4px; border-radius: 8px;">
                   <button type="button" class="btn-tab-pill active" id="tab-jobs-pending" style="border:none; padding: 4px 10px; font-size: 0.85em; border-radius: 6px; font-weight:600; cursor:pointer; background: #ffffff; color: var(--text-main); transition: all 0.2s;">Pendientes</button>
                   <button type="button" class="btn-tab-pill" id="tab-jobs-collected" style="border:none; padding: 4px 10px; font-size: 0.85em; border-radius: 6px; font-weight:600; cursor:pointer; background: transparent; color: var(--text-muted); transition: all 0.2s;">Cobrados</button>
@@ -485,26 +479,26 @@
             <!-- Registrar Nuevo Trabajo -->
             <div class="dashboard-card bg-white shadow-sm">
               <div class="card-header">
-                <h3>Registrar Trabajo Realizado</h3>
+                <h3>Registrar Cuenta por Cobrar</h3>
               </div>
               <form id="form-trabajo-por-cobrar" class="budget-form">
                 <div class="form-group">
-                  <label for="job-cliente">Cliente</label>
-                  <input type="text" id="job-cliente" class="form-control" placeholder="Ej. Cineplanet, BBVA, Fotografía de Boda..." required>
+                  <label for="job-cliente">Deudor / Cliente</label>
+                  <input type="text" id="job-cliente" class="form-control" placeholder="Ej. Juan Pérez (préstamo), Cineplanet (trabajo)..." required>
                 </div>
                 <div class="form-group">
-                  <label for="job-descripcion">Detalle o Concepto del Trabajo</label>
-                  <input type="text" id="job-descripcion" class="form-control" placeholder="Ej. Spot publicitario, Cobertura de evento..." required>
+                  <label for="job-descripcion">Concepto o Descripción</label>
+                  <input type="text" id="job-descripcion" class="form-control" placeholder="Ej. Préstamo personal, Servicio de diseño..." required>
                 </div>
                 <div class="form-group">
-                  <label for="job-monto">Monto a Facturar / Cobrar (S/.)</label>
+                  <label for="job-monto">Monto a Cobrar (S/.)</label>
                   <input type="number" id="job-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 1200.00" required>
                 </div>
                 <div class="form-group">
-                  <label for="job-fecha">Fecha del Servicio Realizado</label>
+                  <label for="job-fecha">Fecha de Registro</label>
                   <input type="date" id="job-fecha" class="form-control" required>
                 </div>
-                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 15px;">Registrar Trabajo por Cobrar</button>
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 15px;">Registrar Cuenta por Cobrar</button>
               </form>
             </div>
           </div>

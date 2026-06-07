@@ -283,6 +283,24 @@ export function populateFormSelects() {
     }
   }
 
+  const budgetCatSelect = document.getElementById("budget-category");
+  if (budgetCatSelect) {
+    const prevVal = budgetCatSelect.value;
+    budgetCatSelect.innerHTML = "";
+    Object.keys(CATEGORY_STYLES).forEach(cat => {
+      const isSystemOnly = ["Saldo Inicial", "Deuda Inicial", "Sueldo", "Pago Tarjeta", "Transferencia"].includes(cat);
+      if (!isSystemOnly) {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.text = cat;
+        budgetCatSelect.appendChild(opt);
+      }
+    });
+    if (prevVal && CATEGORY_STYLES[prevVal]) {
+      budgetCatSelect.value = prevVal;
+    }
+  }
+
   // Rellenar filtros del historial
   const filterCat = document.getElementById("tx-filter-categoria");
   if (filterCat) {

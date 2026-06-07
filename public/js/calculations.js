@@ -141,7 +141,9 @@ export function calculateBalances(state) {
     egresosMes,
     saldosCuentas,
     deudasTarjetas,
-    gastosPorCategoriaEsteMes
+    gastosPorCategoriaEsteMes,
+    sumaDebito,
+    sumaDeudas
   };
 }
 
