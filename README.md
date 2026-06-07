@@ -64,8 +64,8 @@ Asegúrate de tener instalado [Node.js](https://nodejs.org) (Versión 18 o super
 ### 2. Clonar y Configurar
 Clona este repositorio en tu máquina local y accede a la carpeta:
 ```bash
-git clone https://github.com/TU_USUARIO/moni-finanzas.git
-cd moni-finanzas
+git clone https://github.com/janodll/Moni-Finanzas.git
+cd Moni-Finanzas
 ```
 
 ### 3. Instalar Dependencias
