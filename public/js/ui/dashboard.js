@@ -107,7 +107,7 @@ export function renderDashboardLists(balances) {
           if (isGasto) {
             if (desc.toUpperCase().includes("USD") || desc.includes("US$") || desc.includes("$")) {
               let usdVal = 0;
-              const match = desc.match(/\$(\d+\.?\d*)/);
+              const match = desc.match(/\$\s*(\d+\.?\d*)/);
               if (match) {
                 usdVal = parseFloat(match[1]);
               } else {
@@ -120,7 +120,7 @@ export function renderDashboardLists(balances) {
           } else if (isIngreso) {
             if (desc.toUpperCase().includes("USD") || desc.includes("US$") || desc.includes("$")) {
               let usdVal = 0;
-              const match = desc.match(/\$(\d+\.?\d*)/);
+              const match = desc.match(/\$\s*(\d+\.?\d*)/);
               if (match) {
                 usdVal = parseFloat(match[1]);
               } else {
