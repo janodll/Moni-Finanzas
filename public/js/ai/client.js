@@ -944,9 +944,17 @@ export async function executeCommand(commandText) {
         renderSuggestions(DEFAULT_SUGGESTIONS);
       } 
       else if (parsedAI.type === "action") {
-        executeParsedAction(parsedAI.actionType, parsedAI.data, parsedAI.response);
-        document.getElementById("command-palette").style.display = "none";
-        document.body.style.overflow = "";
+        if (parsedAI.actionType === "batch") {
+          // v6: lote de movimientos — mostrar vista previa de confirmación
+          showBatchPreview(parsedAI.data, parsedAI.response);
+          input.value = "";
+          commandPaletteState.parsedLocal = null;
+          document.getElementById("command-preview-panel").style.display = "none";
+        } else {
+          executeParsedAction(parsedAI.actionType, parsedAI.data, parsedAI.response);
+          document.getElementById("command-palette").style.display = "none";
+          document.body.style.overflow = "";
+        }
       }
 
     } catch (error) {
@@ -1104,6 +1112,125 @@ export async function executeCommand(commandText) {
     document.getElementById("command-palette").style.display = "none";
     document.body.style.overflow = "";
   }
+}
+
+// v6: Normaliza una transacción de lote (defaults seguros + exclusividad cuenta/tarjeta)
+function normalizeBatchTx(t) {
+  const monto = parseFloat(t.monto);
+  if (!monto || monto <= 0) return null;
+
+  let cuentaId = t.cuenta_id ? parseInt(t.cuenta_id) : null;
+  let tarjetaId = t.tarjeta_id ? parseInt(t.tarjeta_id) : null;
+  if (cuentaId && tarjetaId) cuentaId = null; // BUG-07: exclusividad
+
+  // Si la IA no identificó origen, usar la primera cuenta (igual que el flujo individual)
+  if (!cuentaId && !tarjetaId && state.cuentas && state.cuentas.length > 0) {
+    cuentaId = state.cuentas[0].id;
+  }
+
+  return {
+    fecha: t.fecha || new Date().toISOString().substring(0, 10),
+    tipo: t.tipo === "INGRESO" ? "INGRESO" : "GASTO",
+    categoria: t.categoria || "Otros",
+    descripcion: t.descripcion || "",
+    monto: monto,
+    moneda: t.moneda === "US$" ? "US$" : "S/.",
+    cuenta_id: cuentaId,
+    tarjeta_id: tarjetaId,
+    fijo: t.fijo === "Fijo" ? "Fijo" : "Variable"
+  };
+}
+
+function batchOriginName(t) {
+  if (t.tarjeta_id) {
+    const tj = state.tarjetas.find(x => parseInt(x.id) === parseInt(t.tarjeta_id));
+    return tj ? `${tj.nombre} (Tarj)` : "Tarjeta";
+  }
+  if (t.cuenta_id) {
+    const c = state.cuentas.find(x => parseInt(x.id) === parseInt(t.cuenta_id));
+    return c ? `${c.nombre} (Cta)` : "Cuenta";
+  }
+  return "Sin origen";
+}
+
+// v6: Vista previa de un lote de movimientos detectado por la IA
+export function showBatchPreview(data, responseMsg) {
+  const normalized = (data?.transacciones || [])
+    .map(normalizeBatchTx)
+    .filter(t => t !== null);
+
+  if (normalized.length === 0) {
+    showToast("Lote vacío", "No se detectaron movimientos válidos en la instrucción.", "error");
+    return;
+  }
+
+  const chatPanel = document.getElementById("command-chat-response");
+  const chatBody = document.getElementById("command-chat-body");
+  if (!chatPanel || !chatBody) return;
+
+  chatPanel.style.display = "flex";
+
+  const mon = state.configuracion.moneda || "S/.";
+  const rowsHtml = normalized.map((t, i) => {
+    const esGasto = t.tipo === "GASTO";
+    const sym = t.moneda === "US$" ? "US$" : mon;
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 10px; border:1px solid var(--border-color); border-radius:8px; font-size:0.86em;">
+        <div style="min-width:0;">
+          <div style="font-weight:600; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i + 1}. ${escapeHTML(t.descripcion) || escapeHTML(t.categoria)}</div>
+          <div style="color:var(--text-muted); font-size:0.86em;">${escapeHTML(t.categoria)} · ${escapeHTML(batchOriginName(t))} · ${formatDateStr(t.fecha)}</div>
+        </div>
+        <strong style="white-space:nowrap; color:${esGasto ? 'var(--color-red)' : 'var(--color-green)'};">${esGasto ? '-' : '+'}${sym} ${formatNumber(t.monto)}</strong>
+      </div>
+    `;
+  }).join("");
+
+  const previewId = `batch-preview-${Date.now()}`;
+  const html = `
+    <div id="${previewId}" style="margin-top:10px;">
+      <div style="font-size:0.78em; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+        Vista previa — ${normalized.length} movimiento${normalized.length > 1 ? 's' : ''} detectado${normalized.length > 1 ? 's' : ''}
+      </div>
+      ${responseMsg ? `<div style="font-size:0.88em; color:var(--text-main); margin-bottom:10px;">${escapeHTML(responseMsg)}</div>` : ''}
+      <div style="display:flex; flex-direction:column; gap:6px;">${rowsHtml}</div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:12px;">
+        <button type="button" class="btn btn-secondary batch-cancel" style="padding:6px 14px; font-size:0.85em;">Cancelar</button>
+        <button type="button" class="btn btn-primary batch-confirm" style="padding:6px 14px; font-size:0.85em;">Registrar todos (${normalized.length})</button>
+      </div>
+    </div>
+  `;
+
+  chatBody.insertAdjacentHTML('beforeend', html);
+  chatBody.scrollTop = chatBody.scrollHeight;
+
+  const previewEl = document.getElementById(previewId);
+  previewEl.querySelector(".batch-cancel").addEventListener("click", () => {
+    previewEl.remove();
+    showToast("Lote descartado", "No se registró ningún movimiento.", "info");
+  });
+  previewEl.querySelector(".batch-confirm").addEventListener("click", () => {
+    executeBatch(normalized);
+    previewEl.remove();
+    document.getElementById("command-palette").style.display = "none";
+    document.body.style.overflow = "";
+  });
+}
+
+// v6: Registra un lote de transacciones ya normalizadas (un solo guardado)
+export function executeBatch(txList) {
+  let nextId = generateUniqueId();
+  let count = 0;
+
+  txList.forEach(t => {
+    state.transacciones.unshift({ id: nextId++, ...t });
+    count++;
+  });
+
+  if (count > 0) {
+    saveState();
+    showToast("Registro en lote", `${count} movimiento${count > 1 ? 's' : ''} registrado${count > 1 ? 's' : ''} con éxito.`, "success");
+  }
+  return count;
 }
 
 // Ejecutor de acción estructurada

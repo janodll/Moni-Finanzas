@@ -84,6 +84,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   createToastContainer();
   setupSettings();
   setupReports();
+  setupQuickBatch();
 });
 
 // Renderizar la fecha de la cabecera
@@ -243,6 +244,158 @@ export function setupModalEvents() {
 
       listPending.style.display = "none";
       listCollected.style.display = "flex";
+    });
+  }
+}
+
+// v6: Registro Rápido — modal multi-fila para registrar varios movimientos a la vez
+export function setupQuickBatch() {
+  const modal = document.getElementById("modal-registro-rapido");
+  const btnOpen = document.getElementById("btn-registro-rapido");
+  const btnClose = document.getElementById("btn-close-modal-batch");
+  const btnAdd = document.getElementById("btn-batch-add-row");
+  const btnSave = document.getElementById("btn-batch-save");
+  const container = document.getElementById("batch-rows-container");
+  const summary = document.getElementById("batch-summary");
+
+  if (!modal || !btnOpen || !container) return;
+
+  const todayStr = () => new Date().toISOString().substring(0, 10);
+
+  const updateSummary = () => {
+    if (!summary) return;
+    const listos = [...container.querySelectorAll(".batch-monto")]
+      .filter(inp => parseFloat(inp.value) > 0).length;
+    summary.innerText = listos > 0 ? `${listos} movimiento${listos > 1 ? 's' : ''} listo${listos > 1 ? 's' : ''}` : "";
+  };
+
+  const mkSelect = (className, options) => {
+    const sel = document.createElement("select");
+    sel.className = `form-control ${className}`;
+    options.forEach(([val, label]) => {
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.text = label;
+      sel.appendChild(opt);
+    });
+    return sel;
+  };
+
+  const createRow = () => {
+    const row = document.createElement("div");
+    row.className = "batch-row";
+    row.style.cssText = "display:grid; grid-template-columns:120px 96px 80px 100px 1fr 1fr 1.2fr 32px; gap:8px; align-items:center;";
+
+    const fecha = document.createElement("input");
+    fecha.type = "date";
+    fecha.className = "form-control batch-fecha";
+    fecha.value = todayStr();
+
+    const tipo = mkSelect("batch-tipo", [["GASTO", "Gasto"], ["INGRESO", "Ingreso"]]);
+
+    const moneda = mkSelect("batch-moneda", [["S/.", "S/."], ["US$", "US$"]]);
+
+    const monto = document.createElement("input");
+    monto.type = "number";
+    monto.step = "0.01";
+    monto.min = "0.01";
+    monto.placeholder = "0.00";
+    monto.className = "form-control batch-monto";
+    monto.addEventListener("input", updateSummary);
+
+    const catOptions = Object.keys(CATEGORY_STYLES)
+      .filter(c => c !== "Saldo Inicial" && c !== "Deuda Inicial")
+      .map(c => [c, c]);
+    const categoria = mkSelect("batch-categoria", catOptions);
+    categoria.value = "Comida";
+
+    const origenOptions = [
+      ...state.cuentas.map(c => [`cta-${c.id}`, `[Cta] ${c.nombre}`]),
+      ...state.tarjetas.map(t => [`tarj-${t.id}`, `[Tarj] ${t.nombre}`])
+    ];
+    const origen = mkSelect("batch-origen", origenOptions);
+
+    const desc = document.createElement("input");
+    desc.type = "text";
+    desc.placeholder = "Descripción (opcional)";
+    desc.className = "form-control batch-desc";
+
+    const btnDel = document.createElement("button");
+    btnDel.type = "button";
+    btnDel.title = "Quitar fila";
+    btnDel.style.cssText = "color:var(--text-red); border:none; background:transparent; cursor:pointer; font-size:1.1rem; font-weight:700; line-height:1;";
+    btnDel.innerText = "×";
+    btnDel.addEventListener("click", () => {
+      if (container.querySelectorAll(".batch-row").length > 1) {
+        row.remove();
+      } else {
+        // Última fila: solo limpiar
+        monto.value = "";
+        desc.value = "";
+      }
+      updateSummary();
+    });
+
+    [fecha, tipo, moneda, monto, categoria, origen, desc, btnDel].forEach(el => row.appendChild(el));
+    return row;
+  };
+
+  const openModal = () => {
+    container.innerHTML = "";
+    for (let i = 0; i < 3; i++) container.appendChild(createRow());
+    updateSummary();
+    modal.classList.add("active");
+    // Foco en el primer monto para empezar a teclear de inmediato
+    setTimeout(() => container.querySelector(".batch-monto")?.focus(), 100);
+  };
+
+  btnOpen.addEventListener("click", openModal);
+  if (btnClose) btnClose.addEventListener("click", () => modal.classList.remove("active"));
+  if (btnAdd) btnAdd.addEventListener("click", () => {
+    const row = createRow();
+    container.appendChild(row);
+    row.querySelector(".batch-monto")?.focus();
+  });
+
+  if (btnSave) {
+    btnSave.addEventListener("click", () => {
+      const rows = [...container.querySelectorAll(".batch-row")];
+      const nuevas = [];
+
+      rows.forEach(row => {
+        const monto = parseFloat(row.querySelector(".batch-monto").value);
+        if (!monto || monto <= 0) return; // filas vacías se ignoran
+
+        const origenRaw = row.querySelector(".batch-origen").value;
+        let cuenta_id = null;
+        let tarjeta_id = null;
+        if (origenRaw.startsWith("cta-")) cuenta_id = parseInt(origenRaw.replace("cta-", ""));
+        else if (origenRaw.startsWith("tarj-")) tarjeta_id = parseInt(origenRaw.replace("tarj-", ""));
+
+        nuevas.push({
+          fecha: row.querySelector(".batch-fecha").value || todayStr(),
+          tipo: row.querySelector(".batch-tipo").value,
+          moneda: row.querySelector(".batch-moneda").value === "US$" ? "US$" : "S/.",
+          monto,
+          categoria: row.querySelector(".batch-categoria").value,
+          descripcion: row.querySelector(".batch-desc").value.trim(),
+          cuenta_id,
+          tarjeta_id,
+          fijo: "Variable"
+        });
+      });
+
+      if (nuevas.length === 0) {
+        showToast("Sin movimientos", "Ingresa al menos un monto para registrar.", "error");
+        return;
+      }
+
+      let nextId = generateUniqueId();
+      nuevas.forEach(tx => state.transacciones.unshift({ id: nextId++, ...tx }));
+
+      modal.classList.remove("active");
+      saveState();
+      showToast("Registro Rápido", `${nuevas.length} movimiento${nuevas.length > 1 ? 's' : ''} registrado${nuevas.length > 1 ? 's' : ''} con éxito.`, "success");
     });
   }
 }

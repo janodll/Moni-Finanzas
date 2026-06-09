@@ -97,6 +97,22 @@ REGLAS DE PROCESAMIENTO:
      }
    }
 
+   F) REGISTRAR VARIOS MOVIMIENTOS EN UNA SOLA INSTRUCCIÓN (LOTE):
+   Si el usuario menciona DOS O MÁS gastos/ingresos en la misma instrucción (ej: "hoy gasté 20 en taxi con BCP, 35 en almuerzo con la CMR y me depositaron 100 en Interbank"), NO registres solo el primero. Retorna TODOS en un lote:
+   {
+     "type": "action",
+     "actionType": "batch",
+     "response": "<Resumen breve en español de los movimientos detectados>",
+     "data": {
+       "transacciones": [
+         { <objeto con EXACTAMENTE el mismo formato del campo "data" del tipo A: tipo, fecha, monto, moneda, categoria, descripcion, cuenta_id, tarjeta_id, fijo> },
+         { ... un objeto por cada movimiento mencionado ... }
+       ]
+     }
+   }
+   - Si algún movimiento no especifica cuenta/tarjeta, usa cuenta_id: null y tarjeta_id: null (el usuario lo corregirá en la vista previa).
+   - El lote es solo para transacciones GASTO/INGRESO simples; si la instrucción mezcla transferencias o pagos de recordatorios, procesa la acción más clara y pide aclarar el resto.
+
 4. RESOLUCIÓN DE PREGUNTAS ACLARATORIAS (MULTI-TURNO):
    - Si en el historial de conversación (history) tú hiciste una pregunta aclaratoria (ej. "¿Con qué cuenta pagaste?", "¿Qué monto?", etc.) y el usuario responde en su último turno con un dato simple (ej. "Efectivo", "50", "la tarjeta VISA"), debes interpretar esa respuesta como el parámetro faltante para la acción que se estaba intentando registrar en el primer turno del historial.
    - En este caso, debes combinar la información de los turnos previos (ej. "Compré una coca cola a 5 soles") y el último turno (ej. "Efectivo") para generar un comando de acción completo ("type": "action") registrando la transacción con todos los parámetros correctos. NUNCA respondas con una consulta general o saldo en este caso.

@@ -123,6 +123,9 @@
           <button class="btn btn-secondary" id="btn-transferencia">
             <i data-lucide="repeat"></i> Transferir
           </button>
+          <button class="btn btn-secondary" id="btn-registro-rapido">
+            <i data-lucide="list-plus"></i> Registro Rápido
+          </button>
           <button class="btn btn-primary" id="btn-nueva-transaccion">
             <i data-lucide="plus"></i> Nueva Transacción
           </button>
@@ -853,6 +856,36 @@
         </div>
         <button type="submit" class="btn btn-primary btn-block" style="margin-top: 20px;">Ejecutar Transferencia</button>
       </form>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRO RÁPIDO MULTI-FILA (v6) -->
+  <div class="modal" id="modal-registro-rapido">
+    <div class="modal-content" style="max-width: 980px; width: 95%;">
+      <div class="modal-header">
+        <h3>Registro Rápido — varios movimientos a la vez</h3>
+        <button class="modal-close" id="btn-close-modal-batch"><i data-lucide="x"></i></button>
+      </div>
+      <p class="text-muted" style="font-size: 0.85rem; margin: 0 0 14px 0;">
+        Agrega una fila por movimiento y guarda todo de una sola vez. Las filas sin monto se ignoran.
+      </p>
+      <div style="overflow-x: auto;">
+        <div id="batch-rows-header" style="display: grid; grid-template-columns: 120px 96px 80px 100px 1fr 1fr 1.2fr 32px; gap: 8px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); padding: 0 2px 6px 2px; min-width: 820px;">
+          <span>Fecha</span><span>Tipo</span><span>Moneda</span><span>Monto</span><span>Categoría</span><span>Cuenta/Tarjeta</span><span>Descripción</span><span></span>
+        </div>
+        <div id="batch-rows-container" style="display: flex; flex-direction: column; gap: 8px; min-width: 820px;">
+          <!-- Filas dinámicas (JS) -->
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; gap: 10px;">
+        <button type="button" class="btn btn-secondary" id="btn-batch-add-row" style="display:flex; align-items:center; gap:6px;">
+          <i data-lucide="plus" style="width:15px; height:15px;"></i> Añadir fila
+        </button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span id="batch-summary" class="text-muted" style="font-size: 0.85rem;"></span>
+          <button type="button" class="btn btn-primary" id="btn-batch-save">Guardar todo</button>
+        </div>
+      </div>
     </div>
   </div>
 

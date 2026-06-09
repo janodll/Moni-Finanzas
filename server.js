@@ -221,6 +221,22 @@ REGLAS DE PROCESAMIENTO:
      }
    }
 
+   F) REGISTRAR VARIOS MOVIMIENTOS EN UNA SOLA INSTRUCCIÓN (LOTE):
+   Si el usuario menciona DOS O MÁS gastos/ingresos en la misma instrucción (ej: "hoy gasté 20 en taxi con BCP, 35 en almuerzo con la CMR y me depositaron 100 en Interbank"), NO registres solo el primero. Retorna TODOS en un lote:
+   {
+     "type": "action",
+     "actionType": "batch",
+     "response": "<Resumen breve en español de los movimientos detectados>",
+     "data": {
+       "transacciones": [
+         { <objeto con EXACTAMENTE el mismo formato del campo "data" del tipo A: tipo, fecha, monto, moneda, categoria, descripcion, cuenta_id, tarjeta_id, fijo> },
+         { ... un objeto por cada movimiento mencionado ... }
+       ]
+     }
+   }
+   - Si algún movimiento no especifica cuenta/tarjeta, usa cuenta_id: null y tarjeta_id: null (el usuario lo corregirá en la vista previa).
+   - El lote es solo para transacciones GASTO/INGRESO simples; si la instrucción mezcla transferencias o pagos de recordatorios, procesa la acción más clara y pide aclarar el resto.
+
 CRITICAL: Debes responder ÚNICAMENTE con el objeto JSON válido. No incluyas explicaciones adicionales fuera del JSON. No añadas bloques de markdown alrededor del JSON como \`\`\`json. Solo el texto JSON puro.
 `;
 
