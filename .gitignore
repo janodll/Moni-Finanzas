@@ -15,3 +15,10 @@ scratch/
 
 # Archivos de auditorías de seguridad interna
 AUDITORIA*.md
+
+# Registros de cambios de sesión
+CAMBIOS*.md
+
+
+# Local Netlify folder
+.netlify
