@@ -46,10 +46,26 @@ export function formatDateStr(dateStr, format = "DD/MM/YYYY") {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Realiza todos los cálculos matemáticos del estado actual de transacciones
-export function calculateBalances(state) {
-  const currentMonthStr = getCurrentMonthString(); // Formato YYYY-MM
-  
+// v6: Monto de una transacción expresado en Soles.
+// Las transacciones pueden tener un campo `moneda` ("S/." o "US$").
+// Si es US$, el monto se almacena en dólares y se convierte con el tipo de cambio.
+// Las transacciones antiguas sin campo `moneda` se asumen en Soles (retrocompatible).
+export function getMontoEnSoles(tx, tipoCambio) {
+  const monto = parseFloat(tx.monto) || 0;
+  if (tx.moneda === "US$") {
+    return monto * (parseFloat(tipoCambio) || 3.80);
+  }
+  return monto;
+}
+
+// Realiza todos los cálculos matemáticos del estado actual de transacciones.
+// TEST-01: `monthStr` (formato YYYY-MM) es opcional; por defecto usa el mes
+// actual del sistema. Pasarlo explícito permite tests deterministas y
+// calcular agregados de cualquier mes histórico.
+export function calculateBalances(state, monthStr) {
+  const currentMonthStr = monthStr || getCurrentMonthString(); // Formato YYYY-MM
+  const tipoCambio = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
+
   let balanceGeneral = 0;
   let ingresosMes = 0;
   let egresosMes = 0;
@@ -76,7 +92,7 @@ export function calculateBalances(state) {
   // Procesar todas las transacciones
   if (state.transacciones) {
     state.transacciones.forEach(tx => {
-      const monto = parseFloat(tx.monto) || 0;
+      const monto = getMontoEnSoles(tx, tipoCambio);
       if (!tx.fecha) return;
       const txMonth = tx.fecha.substring(0, 7); // extrae YYYY-MM
 

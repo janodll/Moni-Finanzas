@@ -1,8 +1,8 @@
 // Renderizado de métricas y gráficos del inicio (Dashboard) de Moni
 
 import { state, CATEGORY_STYLES, saveState } from '../state.js';
-import { formatNumber, formatDateStr, getCurrentMonthString } from '../calculations.js';
-import { safeCreateIcons } from './components.js';
+import { formatNumber, formatDateStr, getCurrentMonthString, getMontoEnSoles } from '../calculations.js';
+import { safeCreateIcons, escapeHTML, showUndoToast } from './components.js';
 
 let chartFlowInstance = null;
 let chartCategoriesInstance = null;
@@ -11,7 +11,10 @@ let chartCategoriesInstance = null;
 export function renderTotals(balances) {
   const mon = state.configuracion.moneda || "S/.";
   
-  document.getElementById("val-balance").innerHTML = `<span class="metric-symbol">${mon}</span><span class="metric-num">${formatNumber(balances.balanceGeneral)}</span>`;
+  // v6: color condicional según signo del balance
+  const valBalanceEl = document.getElementById("val-balance");
+  valBalanceEl.innerHTML = `<span class="metric-symbol">${mon}</span><span class="metric-num">${formatNumber(balances.balanceGeneral)}</span>`;
+  valBalanceEl.classList.toggle("metric-negative", balances.balanceGeneral < 0);
   document.getElementById("val-ingresos").innerHTML = `<span class="metric-symbol">${mon}</span><span class="metric-num">${formatNumber(balances.ingresosMes)}</span>`;
   document.getElementById("val-egresos").innerHTML = `<span class="metric-symbol">${mon}</span><span class="metric-num">${formatNumber(balances.egresosMes)}</span>`;
 
@@ -53,11 +56,11 @@ export function renderDashboardLists(balances) {
         <div class="account-info">
           <div class="account-icon"><i data-lucide="building"></i></div>
           <div class="account-details-text">
-            <div class="account-name">${c.nombre}</div>
-            <div class="account-holder">${c.titular}</div>
+            <div class="account-name">${escapeHTML(c.nombre)}</div>
+            <div class="account-holder">${escapeHTML(c.titular)}</div>
           </div>
         </div>
-        <div class="account-balance text-green">${mon} ${formatNumber(saldo)}</div>
+        <div class="account-balance ${saldo < 0 ? 'text-red' : 'text-green'}">${mon} ${formatNumber(saldo)}</div>
       `;
       accountsContainer.appendChild(item);
     });
@@ -96,40 +99,38 @@ export function renderDashboardLists(balances) {
           const desc = tx.descripcion || "";
           const isGasto = tx.tipo === "GASTO";
           const isIngreso = tx.tipo === "INGRESO";
-          
+
           if (desc === "Deuda Inicial") {
             const hasInitialDebtProperty = parseFloat(t.deuda_inicial_soles || 0) !== 0 || parseFloat(t.deuda_inicial_usd || 0) !== 0;
             if (hasInitialDebtProperty) {
               return;
             }
           }
-          
+
+          // v6: si la transacción tiene campo `moneda` explícito, se usa directamente.
+          // El parsing de la descripción se mantiene solo para transacciones antiguas.
+          let esUSD;
+          let usdVal = 0;
+          if (tx.moneda === "US$") {
+            esUSD = true;
+            usdVal = monto; // monto almacenado en dólares
+          } else if (tx.moneda === "S/.") {
+            esUSD = false;
+          } else {
+            // Legacy: detectar por descripción
+            esUSD = desc.toUpperCase().includes("USD") || desc.includes("US$") || desc.includes("$");
+            if (esUSD) {
+              const match = desc.match(/\$\s*(\d+\.?\d*)/);
+              usdVal = match ? parseFloat(match[1]) : monto / tc;
+            }
+          }
+
           if (isGasto) {
-            if (desc.toUpperCase().includes("USD") || desc.includes("US$") || desc.includes("$")) {
-              let usdVal = 0;
-              const match = desc.match(/\$\s*(\d+\.?\d*)/);
-              if (match) {
-                usdVal = parseFloat(match[1]);
-              } else {
-                usdVal = monto / tc;
-              }
-              usdDebt += usdVal;
-            } else {
-              solesDebt += monto;
-            }
+            if (esUSD) usdDebt += usdVal;
+            else solesDebt += monto;
           } else if (isIngreso) {
-            if (desc.toUpperCase().includes("USD") || desc.includes("US$") || desc.includes("$")) {
-              let usdVal = 0;
-              const match = desc.match(/\$\s*(\d+\.?\d*)/);
-              if (match) {
-                usdVal = parseFloat(match[1]);
-              } else {
-                usdVal = monto / tc;
-              }
-              usdDebt -= usdVal;
-            } else {
-              solesDebt -= monto;
-            }
+            if (esUSD) usdDebt -= usdVal;
+            else solesDebt -= monto;
           }
         });
       }
@@ -175,8 +176,8 @@ export function renderDashboardLists(balances) {
             <i data-lucide="${isCredito ? 'credit-card' : 'smartphone'}"></i>
           </div>
           <div class="card-details-text">
-            <div class="card-name">${t.nombre}</div>
-            <div class="card-holder">${isCredito ? 'Crédito • ' + t.titular : 'Débito • ' + t.titular}</div>
+            <div class="card-name">${escapeHTML(t.nombre)}</div>
+            <div class="card-holder">${isCredito ? 'Crédito • ' + escapeHTML(t.titular) : 'Débito • ' + escapeHTML(t.titular)}</div>
           </div>
         </div>
         <div class="card-debt">
@@ -209,13 +210,13 @@ export function renderDashboardLists(balances) {
               <span class="category-badge-icon" style="background-color:${estiloCat.bg}; color:${estiloCat.color};">
                 <i data-lucide="${estiloCat.icon}" style="width:14px; height:14px;"></i>
               </span>
-              <span>${tx.categoria}</span>
+              <span>${escapeHTML(tx.categoria)}</span>
             </div>
           </td>
-          <td class="text-muted">${tx.descripcion || "Sin detalle"}</td>
-          <td><span style="font-size:0.85em; font-weight:600; color:var(--text-muted);">${procedencia}</span></td>
+          <td class="text-muted">${escapeHTML(tx.descripcion) || "Sin detalle"}</td>
+          <td><span style="font-size:0.85em; font-weight:600; color:var(--text-muted);">${escapeHTML(procedencia)}</span></td>
           <td class="td-amount ${esGasto ? 'text-red' : 'text-green'}">
-            ${esGasto ? '-' : '+'}${mon} ${formatNumber(tx.monto)}
+            ${esGasto ? '-' : '+'}${tx.moneda === "US$" ? "US$" : mon} ${formatNumber(tx.monto)}
           </td>
         `;
         dashTxBody.appendChild(row);
@@ -353,11 +354,12 @@ function getFlowDataLast6Months() {
     gastosPorMes[monthKey] = 0;
   }
 
+  const tcFlow = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
   state.transacciones.forEach(tx => {
     const txMonth = tx.fecha.substring(0, 7);
     if (ingresosPorMes[txMonth] !== undefined) {
       if (tx.categoria !== "Pago Tarjeta" && tx.categoria !== "Transferencia" && tx.categoria !== "Saldo Inicial" && tx.categoria !== "Deuda Inicial") {
-        const monto = parseFloat(tx.monto);
+        const monto = getMontoEnSoles(tx, tcFlow);
         if (tx.tipo === "INGRESO") {
           ingresosPorMes[txMonth] += monto;
         } else if (tx.tipo === "GASTO") {
@@ -378,11 +380,12 @@ function getCategoryDataThisMonth() {
   const currentMonthStr = getCurrentMonthString();
   const sums = {};
 
+  const tcCat = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
   state.transacciones.forEach(tx => {
     const txMonth = tx.fecha.substring(0, 7);
     if (txMonth === currentMonthStr && tx.tipo === "GASTO" && tx.categoria !== "Pago Tarjeta" && tx.categoria !== "Transferencia" && tx.categoria !== "Saldo Inicial" && tx.categoria !== "Deuda Inicial") {
       const cat = tx.categoria || "Otros";
-      sums[cat] = (sums[cat] || 0) + parseFloat(tx.monto);
+      sums[cat] = (sums[cat] || 0) + getMontoEnSoles(tx, tcCat);
     }
   });
 
@@ -419,8 +422,8 @@ export function renderBudgets(gastosCategoria) {
     item.innerHTML = `
       <div style="display:flex; justify-content:space-between; margin-bottom:8px; align-items:center;">
         <div style="display:flex; align-items:center; gap:8px;">
-          <span style="font-weight:600; color:var(--text-main);">${b.categoria}</span>
-          <button class="btn-delete-budget" data-category="${b.categoria}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:2px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Eliminar presupuesto">
+          <span style="font-weight:600; color:var(--text-main);">${escapeHTML(b.categoria)}</span>
+          <button class="btn-delete-budget" data-category="${escapeHTML(b.categoria)}" style="color:var(--text-red); border:none; background:transparent; cursor:pointer; padding:2px; display:flex; align-items:center; justify-content:center; width:20px; height:20px;" title="Eliminar presupuesto">
             <i data-lucide="trash-2" style="width:12px; height:12px;"></i>
           </button>
         </div>
@@ -433,14 +436,18 @@ export function renderBudgets(gastosCategoria) {
     container.appendChild(item);
   });
 
-  // Event listener para eliminar presupuestos
+  // Event listener para eliminar presupuestos (v6: borrado con Deshacer)
   container.querySelectorAll(".btn-delete-budget").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const category = e.currentTarget.getAttribute("data-category");
-      if (confirm(`¿Estás seguro de que deseas eliminar el presupuesto de la categoría "${category}"?`)) {
-        state.presupuestos = state.presupuestos.filter(b => b.categoria !== category);
+      const idx = state.presupuestos.findIndex(b => b.categoria === category);
+      if (idx < 0) return;
+      const removed = state.presupuestos.splice(idx, 1)[0];
+      saveState();
+      showUndoToast("Presupuesto eliminado", `Se quitó el presupuesto de "${category}".`, () => {
+        state.presupuestos.splice(idx, 0, removed);
         saveState();
-      }
+      });
     });
   });
 }
@@ -482,12 +489,19 @@ export function renderReminders() {
       return;
     }
 
+    const todayStr = new Date().toISOString().substring(0, 10);
+
     pendientes.forEach(r => {
       const item = document.createElement("div");
       item.className = "reminder-item";
-      
+
       const isTarjeta = r.tipo === "Tarjeta";
       const iconName = isTarjeta ? "credit-card" : "lightbulb";
+
+      // v6: destacar recordatorios vencidos
+      const isOverdue = r.fecha_vencimiento && r.fecha_vencimiento < todayStr;
+      const overdueBadge = isOverdue ? `<span class="overdue-badge">Vencido</span>` : "";
+      const dueStyle = isOverdue ? 'style="color:var(--color-red); font-weight:600;"' : 'class="text-muted"';
 
       item.innerHTML = `
         <div style="display:flex; align-items:center; gap:12px;">
@@ -495,8 +509,8 @@ export function renderReminders() {
             <i data-lucide="${iconName}" style="width:16px; height:16px;"></i>
           </span>
           <div>
-            <div style="font-weight:600; color:var(--text-main);">${r.nombre}</div>
-            <small class="text-muted">Vence: ${formatDateStr(r.fecha_vencimiento, state.configuracion?.formato_fecha)}</small>
+            <div style="font-weight:600; color:var(--text-main);">${escapeHTML(r.nombre)}${overdueBadge}</div>
+            <small ${dueStyle}>Vence: ${formatDateStr(r.fecha_vencimiento, state.configuracion?.formato_fecha)}</small>
           </div>
         </div>
         <div style="text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
@@ -522,16 +536,18 @@ export function renderReminders() {
       });
     });
 
-    // Agregar event listeners a los botones de eliminar
+    // Agregar event listeners a los botones de eliminar (v6: borrado con Deshacer)
     container.querySelectorAll(".btn-delete-reminder").forEach(btn => {
       btn.addEventListener("click", (e) => {
         const id = parseInt(e.currentTarget.getAttribute("data-id"));
-        const rem = state.recordatorios.find(r => parseInt(r.id) === id);
-        const remName = rem ? rem.nombre : "este recordatorio";
-        if (confirm(`¿Estás seguro de que deseas eliminar el recordatorio "${remName}"?`)) {
-          state.recordatorios = state.recordatorios.filter(r => parseInt(r.id) !== id);
+        const idx = state.recordatorios.findIndex(r => parseInt(r.id) === id);
+        if (idx < 0) return;
+        const removed = state.recordatorios.splice(idx, 1)[0];
+        saveState();
+        showUndoToast("Recordatorio eliminado", `Se eliminó "${removed.nombre}".`, () => {
+          state.recordatorios.splice(idx, 0, removed);
           saveState();
-        }
+        });
       });
     });
   };
@@ -562,7 +578,7 @@ export function renderSavingsGoals() {
     card.className = "savings-goal-card";
     card.innerHTML = `
       <div class="goal-card-header">
-        <span class="goal-card-title">${m.nombre}</span>
+        <span class="goal-card-title">${escapeHTML(m.nombre)}</span>
         <span class="goal-card-target" style="font-weight:700; color:var(--color-indigo);">${mon} ${formatNumber(m.objetivo)}</span>
       </div>
       <div class="goal-card-progress">
@@ -595,16 +611,18 @@ export function renderSavingsGoals() {
     });
   });
 
-  // Event listener para eliminar metas
+  // Event listener para eliminar metas (v6: borrado con Deshacer)
   container.querySelectorAll(".btn-delete-meta").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const id = parseInt(e.currentTarget.getAttribute("data-id"));
-      const meta = state.metas.find(m => parseInt(m.id) === id);
-      const metaName = meta ? meta.nombre : "esta meta";
-      if (confirm(`¿Estás seguro de que deseas eliminar la meta de ahorro "${metaName}"?`)) {
-        state.metas = state.metas.filter(m => parseInt(m.id) !== id);
+      const idx = state.metas.findIndex(m => parseInt(m.id) === id);
+      if (idx < 0) return;
+      const removed = state.metas.splice(idx, 1)[0];
+      saveState();
+      showUndoToast("Meta eliminada", `Se eliminó la meta "${removed.nombre}".`, () => {
+        state.metas.splice(idx, 0, removed);
         saveState();
-      }
+      });
     });
   });
 
@@ -639,8 +657,8 @@ export function renderPorCobrar() {
       card.innerHTML = `
         <div class="job-header-details">
           <div>
-            <div class="job-client">${job.cliente}</div>
-            <div class="text-muted" style="font-size: 0.85em;">${job.descripcion} • Emisión: ${formatDateStr(job.fecha_emision, state.configuracion?.formato_fecha)}</div>
+            <div class="job-client">${escapeHTML(job.cliente)}</div>
+            <div class="text-muted" style="font-size: 0.85em;">${escapeHTML(job.descripcion)} • Emisión: ${formatDateStr(job.fecha_emision, state.configuracion?.formato_fecha)}</div>
           </div>
           <div style="text-align: right; display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
             <div class="job-amount text-orange">${mon} ${formatNumber(job.monto)}</div>
@@ -672,8 +690,8 @@ export function renderPorCobrar() {
       card.innerHTML = `
         <div class="job-header-details">
           <div>
-            <div class="job-client">${job.cliente}</div>
-            <div class="text-muted" style="font-size: 0.85em;">${job.descripcion} • Cobrado en: ${ctaNombre} el ${formatDateStr(job.fecha_cobro, state.configuracion?.formato_fecha)}</div>
+            <div class="job-client">${escapeHTML(job.cliente)}</div>
+            <div class="text-muted" style="font-size: 0.85em;">${escapeHTML(job.descripcion)} • Cobrado en: ${escapeHTML(ctaNombre)} el ${formatDateStr(job.fecha_cobro, state.configuracion?.formato_fecha)}</div>
           </div>
           <div style="display:flex; align-items:center; gap:8px;">
             <div class="job-amount text-green">${mon} ${formatNumber(job.monto)}</div>
@@ -697,16 +715,18 @@ export function renderPorCobrar() {
     });
   });
 
-  // Bindear botones de eliminar cobro
+  // Bindear botones de eliminar cobro (v6: borrado con Deshacer)
   const deleteJobHandler = (btn) => {
     btn.addEventListener("click", (e) => {
       const id = parseInt(e.currentTarget.getAttribute("data-id"));
-      const job = state.trabajos_pendientes.find(j => parseInt(j.id) === id);
-      const clientName = job ? job.cliente : "este cobro";
-      if (confirm(`¿Estás seguro de que deseas eliminar el registro de cobro para "${clientName}"?`)) {
-        state.trabajos_pendientes = state.trabajos_pendientes.filter(j => parseInt(j.id) !== id);
+      const idx = state.trabajos_pendientes.findIndex(j => parseInt(j.id) === id);
+      if (idx < 0) return;
+      const removed = state.trabajos_pendientes.splice(idx, 1)[0];
+      saveState();
+      showUndoToast("Cobro eliminado", `Se eliminó el registro de "${removed.cliente}".`, () => {
+        state.trabajos_pendientes.splice(idx, 0, removed);
         saveState();
-      }
+      });
     });
   };
 

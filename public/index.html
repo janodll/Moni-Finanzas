@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Moni - Tu Asistente de Finanzas Personales</title>
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#6366F1">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
   <!-- Google Fonts: Outfit (títulos) e Inter (cuerpo) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -272,6 +277,19 @@
                   <option value="">Todas las cuentas/tarjetas</option>
                   <!-- Dinámico -->
                 </select>
+                <select id="tx-filter-periodo" class="form-control select-control">
+                  <option value="">Todo el periodo</option>
+                  <option value="este-mes">Este mes</option>
+                  <option value="mes-pasado">Mes pasado</option>
+                  <option value="3-meses">Últimos 3 meses</option>
+                  <option value="este-anio">Este año</option>
+                  <option value="rango">Rango personalizado…</option>
+                </select>
+                <div id="tx-filter-rango" style="display:none; gap:6px; align-items:center;">
+                  <input type="date" id="tx-filter-desde" class="form-control" title="Desde">
+                  <span class="text-muted" style="font-size:0.8rem;">→</span>
+                  <input type="date" id="tx-filter-hasta" class="form-control" title="Hasta">
+                </div>
               </div>
               <button class="btn btn-secondary" id="btn-exportar-csv">
                 <i data-lucide="download"></i> Exportar CSV
@@ -753,8 +771,14 @@
 
         <div class="form-row grid-2">
           <div class="form-group">
-            <label for="tx-monto">Monto (S/.)</label>
-            <input type="number" id="tx-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 45.50" required>
+            <label for="tx-monto">Monto</label>
+            <div style="display:flex; gap:6px;">
+              <select id="tx-moneda" class="form-control" style="max-width:84px; flex-shrink:0;" title="Moneda">
+                <option value="S/.">S/.</option>
+                <option value="US$">US$</option>
+              </select>
+              <input type="number" id="tx-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 45.50" required>
+            </div>
           </div>
           <div class="form-group">
             <label for="tx-categoria">Categoría</label>

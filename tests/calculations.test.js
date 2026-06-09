@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { addOneMonth, formatDateStr, calculateBalances } from '../public/js/calculations.js';
+import { addOneMonth, formatDateStr, calculateBalances, getMontoEnSoles } from '../public/js/calculations.js';
 
 test('addOneMonth() date rollover tests', () => {
   // Test basic rollover
@@ -42,7 +42,9 @@ test('calculateBalances() accounting engine calculations', () => {
     ]
   };
 
-  const result = calculateBalances(mockState);
+  // TEST-01: se fija el mes de cálculo para que el test sea determinista
+  // (no depende de la fecha real en que se ejecute la suite)
+  const result = calculateBalances(mockState, '2026-06');
 
   // Cuentas:
   // Cuenta 1: 1000 (inicial) - 100 (gasto) - 200 (transferencia) = 700
@@ -67,4 +69,37 @@ test('calculateBalances() accounting engine calculations', () => {
   // Gastos por categoría:
   assert.strictEqual(result.gastosPorCategoriaEsteMes['Comida'], 100);
   assert.strictEqual(result.gastosPorCategoriaEsteMes['Servicios'], 300);
+});
+
+test('getMontoEnSoles() multi-currency conversion', () => {
+  // Transacción en US$ se convierte con el tipo de cambio
+  assert.strictEqual(getMontoEnSoles({ monto: 10, moneda: 'US$' }, 3.5), 35);
+  // Transacción en soles (explícita o legacy sin campo moneda) no se convierte
+  assert.strictEqual(getMontoEnSoles({ monto: 10, moneda: 'S/.' }, 3.5), 10);
+  assert.strictEqual(getMontoEnSoles({ monto: 10 }, 3.5), 10);
+  // Monto inválido no rompe el cálculo
+  assert.strictEqual(getMontoEnSoles({ monto: 'abc', moneda: 'US$' }, 3.5), 0);
+});
+
+test('calculateBalances() with USD transactions', () => {
+  const mockState = {
+    cuentas: [{ id: 1, nombre: 'BCP', tipo: 'Debito' }],
+    tarjetas: [{ id: 1, nombre: 'Visa', tipo: 'Credito' }],
+    configuracion: { tipo_cambio_usd: 4.0 },
+    transacciones: [
+      { id: 1, fecha: '2026-06-01', tipo: 'INGRESO', monto: 1000, categoria: 'Sueldo', cuenta_id: 1, tarjeta_id: null },
+      // Gasto de 10 USD desde cuenta de débito -> 40 soles
+      { id: 2, fecha: '2026-06-02', tipo: 'GASTO', monto: 10, moneda: 'US$', categoria: 'Comida', cuenta_id: 1, tarjeta_id: null },
+      // Gasto de 25 USD en tarjeta de crédito -> 100 soles de deuda
+      { id: 3, fecha: '2026-06-03', tipo: 'GASTO', monto: 25, moneda: 'US$', categoria: 'Otros', cuenta_id: null, tarjeta_id: 1 }
+    ]
+  };
+
+  const result = calculateBalances(mockState, '2026-06');
+
+  assert.strictEqual(result.saldosCuentas[1], 960);     // 1000 - 40
+  assert.strictEqual(result.deudasTarjetas[1], 100);    // 25 * 4.0
+  assert.strictEqual(result.balanceGeneral, 860);       // 960 - 100
+  assert.strictEqual(result.egresosMes, 140);           // 40 + 100
+  assert.strictEqual(result.gastosPorCategoriaEsteMes['Comida'], 40);
 });

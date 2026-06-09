@@ -1,8 +1,8 @@
 // Historial de Transacciones, Paginación, Filtros y Exportación de Moni
 
 import { state, CATEGORY_STYLES, setEditingTransactionId, saveState } from '../state.js';
-import { formatNumber, formatDateStr, getCurrentMonthString } from '../calculations.js';
-import { safeCreateIcons } from './components.js';
+import { formatNumber, formatDateStr, getCurrentMonthString, getMontoEnSoles } from '../calculations.js';
+import { safeCreateIcons, escapeHTML, showUndoToast } from './components.js';
 import { getOrigenLabel } from './dashboard.js';
 import { populateFormSelects } from '../main.js';
 
@@ -39,6 +39,24 @@ export function setupFilters() {
   if (txFilterCta) txFilterCta.addEventListener("change", () => {
     pagination.currentPage = 1;
     filterTransactions();
+  });
+
+  // v6: filtro por periodo / rango de fechas
+  const txFilterPeriodo = document.getElementById("tx-filter-periodo");
+  const rangoWrap = document.getElementById("tx-filter-rango");
+  if (txFilterPeriodo) {
+    txFilterPeriodo.addEventListener("change", () => {
+      if (rangoWrap) rangoWrap.style.display = txFilterPeriodo.value === "rango" ? "flex" : "none";
+      pagination.currentPage = 1;
+      filterTransactions();
+    });
+  }
+  ["tx-filter-desde", "tx-filter-hasta"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("change", () => {
+      pagination.currentPage = 1;
+      filterTransactions();
+    });
   });
 
   // Cabeceras de ordenamiento
@@ -100,11 +118,36 @@ export function filterTransactions() {
   const cat = catEl ? catEl.value : "";
   const cta = ctaEl ? ctaEl.value : "";
 
+  // v6: calcular límites de fecha según el periodo seleccionado
+  const periodoEl = document.getElementById("tx-filter-periodo");
+  const periodo = periodoEl ? periodoEl.value : "";
+  let fechaDesde = null;
+  let fechaHasta = null;
+
+  if (periodo) {
+    const now = new Date();
+    const ymd = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    if (periodo === "este-mes") {
+      fechaDesde = ymd(new Date(now.getFullYear(), now.getMonth(), 1));
+    } else if (periodo === "mes-pasado") {
+      fechaDesde = ymd(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+      fechaHasta = ymd(new Date(now.getFullYear(), now.getMonth(), 0));
+    } else if (periodo === "3-meses") {
+      fechaDesde = ymd(new Date(now.getFullYear(), now.getMonth() - 2, 1));
+    } else if (periodo === "este-anio") {
+      fechaDesde = `${now.getFullYear()}-01-01`;
+    } else if (periodo === "rango") {
+      fechaDesde = document.getElementById("tx-filter-desde")?.value || null;
+      fechaHasta = document.getElementById("tx-filter-hasta")?.value || null;
+    }
+  }
+
   pagination.filteredTransactions = state.transacciones.filter(tx => {
     const descMatches = (tx.descripcion || "").toLowerCase().includes(query) || (tx.categoria || "").toLowerCase().includes(query);
     const tipoMatches = !tipo || tx.tipo === tipo;
     const catMatches = !cat || tx.categoria === cat;
-    
+
     let ctaMatches = true;
     if (cta) {
       if (cta.startsWith("cta-")) {
@@ -114,7 +157,11 @@ export function filterTransactions() {
       }
     }
 
-    return descMatches && tipoMatches && catMatches && ctaMatches;
+    // Las fechas YYYY-MM-DD se comparan lexicográficamente sin problemas
+    const fechaMatches = (!fechaDesde || (tx.fecha && tx.fecha >= fechaDesde)) &&
+                         (!fechaHasta || (tx.fecha && tx.fecha <= fechaHasta));
+
+    return descMatches && tipoMatches && catMatches && ctaMatches && fechaMatches;
   });
 
   // Aplicar ordenamiento
@@ -206,18 +253,18 @@ export function renderTransactionsTable() {
             <span class="category-badge-icon" style="background-color:${estiloCat.bg}; color:${estiloCat.color};">
               <i data-lucide="${estiloCat.icon}" style="width:14px; height:14px;"></i>
             </span>
-            <span>${tx.categoria}</span>
+            <span>${escapeHTML(tx.categoria)}</span>
           </div>
         </td>
-        <td>${tx.descripcion || "Sin detalle"}</td>
-        <td><span style="font-weight:600; color:var(--text-muted);">${procedencia}</span></td>
+        <td>${escapeHTML(tx.descripcion) || "Sin detalle"}</td>
+        <td><span style="font-weight:600; color:var(--text-muted);">${escapeHTML(procedencia)}</span></td>
         <td>
           <span class="${isFijo ? 'fixed-badge' : 'variable-badge'}">
             ${isFijo ? 'Fijo' : 'Variable'}
           </span>
         </td>
         <td class="td-amount ${esGasto ? 'text-red' : 'text-green'}">
-          ${esGasto ? '-' : '+'}${mon} ${formatNumber(tx.monto)}
+          ${esGasto ? '-' : '+'}${tx.moneda === "US$" ? "US$" : mon} ${formatNumber(tx.monto)}
         </td>
         <td>
           <div style="display: flex; gap: 8px; align-items: center;">
@@ -234,12 +281,23 @@ export function renderTransactionsTable() {
     });
   }
 
-  // Actualizar Info de paginación
+  // Actualizar Info de paginación (v6: incluye totales de lo filtrado)
   const pagInfo = document.getElementById("tx-pagination-info");
   if (pagInfo) {
-    pagInfo.innerText = totalRecords > 0 
-      ? `Mostrando ${startIdx + 1}-${endIdx} de ${totalRecords} registros`
-      : `Mostrando 0 de 0 registros`;
+    if (totalRecords > 0) {
+      // Totales siempre en Soles (las tx en US$ se convierten al tipo de cambio)
+      const tc = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
+      let sumIngresos = 0;
+      let sumGastos = 0;
+      pagination.filteredTransactions.forEach(tx => {
+        const m = getMontoEnSoles(tx, tc);
+        if (tx.tipo === "INGRESO") sumIngresos += m;
+        else if (tx.tipo === "GASTO") sumGastos += m;
+      });
+      pagInfo.innerText = `Mostrando ${startIdx + 1}-${endIdx} de ${totalRecords} registros · Total filtrado: +${mon} ${formatNumber(sumIngresos)} / -${mon} ${formatNumber(sumGastos)}`;
+    } else {
+      pagInfo.innerText = `Mostrando 0 de 0 registros`;
+    }
   }
 
   // Habilitar/Deshabilitar botones
@@ -252,13 +310,11 @@ export function renderTransactionsTable() {
   // Reactivar Lucide en la tabla nueva
   safeCreateIcons();
 
-  // Asignar eventos de eliminación
+  // Asignar eventos de eliminación (v6: borrado con Deshacer)
   document.querySelectorAll(".btn-delete-tx").forEach(btn => {
     btn.addEventListener("click", (e) => {
       const id = parseInt(e.currentTarget.getAttribute("data-id"));
-      if (confirm("¿Estás seguro de eliminar esta transacción?")) {
-        deleteTransaction(id);
-      }
+      deleteTransaction(id);
     });
   });
 
@@ -271,10 +327,39 @@ export function renderTransactionsTable() {
   });
 }
 
-// Eliminar transacción
+// Eliminar transacción (v6: inmediato y reversible con Deshacer;
+// si es pierna de una transferencia, se elimina el par completo)
 export function deleteTransaction(id) {
-  state.transacciones = state.transacciones.filter(tx => parseInt(tx.id) !== id);
+  const idx = state.transacciones.findIndex(tx => parseInt(tx.id) === id);
+  if (idx < 0) return;
+  const tx = state.transacciones[idx];
+
+  if (tx.transfer_id) {
+    // Eliminar ambas piernas de la transferencia
+    const removidas = state.transacciones.filter(t => t.transfer_id === tx.transfer_id);
+    state.transacciones = state.transacciones.filter(t => t.transfer_id !== tx.transfer_id);
+    saveState();
+    showUndoToast(
+      "Transferencia eliminada",
+      `Se eliminaron ambos movimientos del traspaso (${removidas[0]?.monto}).`,
+      () => {
+        state.transacciones.unshift(...removidas);
+        saveState();
+      }
+    );
+    return;
+  }
+
+  const removed = state.transacciones.splice(idx, 1)[0];
   saveState();
+  showUndoToast(
+    "Transacción eliminada",
+    `${removed.descripcion || removed.categoria} (${removed.tipo === "GASTO" ? "-" : "+"}${removed.monto})`,
+    () => {
+      state.transacciones.splice(idx, 0, removed);
+      saveState();
+    }
+  );
 }
 
 // Abrir modal de edición
@@ -284,7 +369,16 @@ export function openEditTransactionModal(id) {
     console.error("Transacción no encontrada:", id);
     return;
   }
-  
+
+  // v6: las piernas de una transferencia no se editan individualmente
+  // para no descuadrar las cuentas. Se elimina el par y se vuelve a crear.
+  if (tx.transfer_id) {
+    import('./components.js').then(({ showToast }) => {
+      showToast("Transferencia vinculada", "Este movimiento es parte de una transferencia. Para modificarla, elimínala (se borran ambas piernas) y créala de nuevo.", "info");
+    });
+    return;
+  }
+
   setEditingTransactionId(id);
   
   // Rellenar selectores del formulario antes de setear el valor
@@ -299,6 +393,8 @@ export function openEditTransactionModal(id) {
   document.getElementById("tx-tipo").value = tx.tipo;
   document.getElementById("tx-fecha").value = tx.fecha;
   document.getElementById("tx-monto").value = tx.monto;
+  const monedaSelect = document.getElementById("tx-moneda");
+  if (monedaSelect) monedaSelect.value = tx.moneda === "US$" ? "US$" : "S/.";
   document.getElementById("tx-categoria").value = tx.categoria;
   document.getElementById("tx-descripcion").value = tx.descripcion || "";
   document.getElementById("tx-fijo").value = tx.fijo || "Variable";
@@ -320,13 +416,14 @@ export function openEditTransactionModal(id) {
 
 // Exportar CSV
 export function exportToCSV() {
-  const headers = ["Fecha", "Tipo", "Categoria", "Descripcion", "Origen/Destino", "Monto", "Obligatoriedad"];
+  const headers = ["Fecha", "Tipo", "Categoria", "Descripcion", "Origen/Destino", "Moneda", "Monto", "Obligatoriedad"];
   const rows = pagination.filteredTransactions.map(tx => [
     tx.fecha,
     tx.tipo,
     tx.categoria,
     (tx.descripcion || "").replace(/"/g, '""'),
     getOrigenLabel(tx),
+    tx.moneda === "US$" ? "US$" : "S/.",
     tx.monto,
     tx.fijo || "Variable"
   ]);

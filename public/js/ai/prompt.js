@@ -36,6 +36,7 @@ REGLAS DE PROCESAMIENTO:
        "tipo": "GASTO" o "INGRESO",
        "fecha": "YYYY-MM-DD",  // Usa la fecha indicada por el usuario, o hoy (${todayStr}) si no se especifica
        "monto": <monto numérico real extraído>,
+       "moneda": "S/." o "US$" (usa "US$" SOLO si el usuario indica explícitamente dólares; por defecto "S/."),
        "categoria": "Comida/Transporte/Servicios/Vivienda/Educación/Entretenimiento/Pago Tarjeta/Transferencia/Ahorro/Otros",
        "descripcion": "<Descripción detallada del movimiento>",
        "cuenta_id": <ID numérico de la cuenta real de state.cuentas, o null si es tarjeta de crédito>,

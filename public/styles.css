@@ -1991,3 +1991,41 @@ body {
   }
 }
 
+/* ===== v6: Botón Deshacer en toasts ===== */
+.toast-undo-btn {
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-main);
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  transition: background 0.15s ease;
+}
+
+.toast-undo-btn:hover {
+  background: rgba(255, 255, 255, 1);
+}
+
+/* ===== v6: Badge de recordatorio vencido ===== */
+.overdue-badge {
+  display: inline-block;
+  background: var(--color-red-light, #FFF1F2);
+  color: var(--color-red, #EF4444);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+
+/* ===== v6: Balance negativo ===== */
+.metric-negative .metric-num,
+.metric-negative .metric-symbol {
+  color: var(--color-red, #EF4444) !important;
+}

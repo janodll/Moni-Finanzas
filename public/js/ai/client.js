@@ -344,8 +344,8 @@ export function renderSuggestions(list) {
 
     div.innerHTML = `
       <i data-lucide="${iconName}"></i>
-      <span>${item.text}</span>
-      <span class="command-suggestion-desc">${item.desc || ""}</span>
+      <span>${escapeHTML(item.text)}</span>
+      <span class="command-suggestion-desc">${escapeHTML(item.desc || "")}</span>
     `;
     
     div.addEventListener("click", () => {
@@ -667,6 +667,7 @@ export function renderLocalPreview(parsed) {
   let originName = "N/A";
   if (parsed.cuenta) originName = parsed.cuenta.nombre;
   if (parsed.tarjeta) originName = parsed.tarjeta.nombre;
+  originName = escapeHTML(originName);
 
   let detailHtml = "";
   if (parsed.action === "TRANSFERENCIA") {
@@ -928,7 +929,7 @@ export async function executeCommand(commandText) {
         
         const turnHtml = `
           ${divider}
-          <div style="font-size: 0.78em; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Pregunta: ${commandText}</div>
+          <div style="font-size: 0.78em; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Pregunta: ${escapeHTML(commandText)}</div>
           <div style="color: var(--text-main); font-size: 0.94em;">${htmlResponse}</div>
         `;
         
@@ -981,15 +982,39 @@ export async function executeCommand(commandText) {
     }
 
     if (parsed.action === "TRANSFERENCIA") {
-      let orig = state.cuentas[0]?.id || 1;
-      let dest = state.cuentas[1]?.id || 2;
-      
-      const parts = commandText.toLowerCase().split(" ");
-      const indexA = parts.indexOf("a");
-      if (indexA >= 0 && parts[indexA + 1]) {
-        const destName = parts[indexA + 1];
-        const match = state.cuentas.find(c => c.nombre.toLowerCase().includes(destName));
-        if (match) dest = match.id;
+      // BUG-05: respetar la cuenta de origen detectada y parsear "de X a Y" completo
+      const lowerCmd = commandText.toLowerCase();
+      let orig = parsed.cuenta ? parsed.cuenta.id : null;
+      let dest = null;
+
+      // Intentar extraer "de <origen> a <destino>" con frases completas
+      const matchDeA = lowerCmd.match(/\bde\s+(.+?)\s+a\s+(.+)$/);
+      if (matchDeA) {
+        const origStr = matchDeA[1].trim();
+        const destStr = matchDeA[2].trim();
+        const findCta = (str) => state.cuentas.find(c => {
+          const n = c.nombre.toLowerCase();
+          return str.includes(n) || n.includes(str);
+        });
+        const oMatch = findCta(origStr);
+        const dMatch = findCta(destStr);
+        if (oMatch) orig = oMatch.id;
+        if (dMatch) dest = dMatch.id;
+      } else {
+        // Solo destino: "transferir 100 a interbank"
+        const matchA = lowerCmd.match(/\ba\s+(.+)$/);
+        if (matchA) {
+          const dMatch = state.cuentas.find(c => matchA[1].trim().includes(c.nombre.toLowerCase()) || c.nombre.toLowerCase().includes(matchA[1].trim()));
+          if (dMatch) dest = dMatch.id;
+        }
+      }
+
+      if (!orig) orig = state.cuentas[0]?.id;
+      if (!dest) dest = state.cuentas.find(c => c.id !== orig)?.id;
+
+      if (!orig || !dest || orig === dest) {
+        showToast("Transferencia ambigua", "No pude identificar cuentas de origen y destino distintas. Especifica: 'transferir 100 de <cuenta> a <cuenta>'.", "error");
+        return;
       }
 
       executeParsedAction("transfer", {
@@ -1067,15 +1092,16 @@ export async function executeCommand(commandText) {
         tipo: parsed.action,
         fecha: parsed.fecha,
         monto: parsed.monto,
+        moneda: parsed.moneda,
         categoria: parsed.categoria || "Otros",
         descripcion: parsed.descripcion,
         cuenta_id: originId,
         tarjeta_id: cardId,
         fijo: "Variable"
-      }, `🚀 Movimiento registrado con éxito por S/. ${parsed.monto.toFixed(2)}.`);
+      }, `🚀 Movimiento registrado con éxito por ${parsed.moneda} ${parsed.monto.toFixed(2)}.`);
     }
 
-    palette.style.display = "none";
+    document.getElementById("command-palette").style.display = "none";
     document.body.style.overflow = "";
   }
 }
@@ -1086,6 +1112,15 @@ export function executeParsedAction(actionType, data, successMessage) {
 
   // A) REGISTRO DE TRANSACCIÓN INDIVIDUAL
   if (actionType === "transaction") {
+    let cuentaId = data.cuenta_id ? parseInt(data.cuenta_id) : null;
+    let tarjetaId = data.tarjeta_id ? parseInt(data.tarjeta_id) : null;
+
+    // BUG-07: una transacción nunca debe afectar cuenta Y tarjeta a la vez
+    // (doble contabilización). Si llegan ambas, prevalece la tarjeta.
+    if (cuentaId && tarjetaId) {
+      cuentaId = null;
+    }
+
     const nuevaTx = {
       id: generateUniqueId(),
       fecha: data.fecha,
@@ -1093,8 +1128,9 @@ export function executeParsedAction(actionType, data, successMessage) {
       categoria: data.categoria,
       descripcion: data.descripcion,
       monto: parseFloat(data.monto),
-      cuenta_id: data.cuenta_id ? parseInt(data.cuenta_id) : null,
-      tarjeta_id: data.tarjeta_id ? parseInt(data.tarjeta_id) : null,
+      moneda: data.moneda === "US$" ? "US$" : "S/.",
+      cuenta_id: cuentaId,
+      tarjeta_id: tarjetaId,
       fijo: data.fijo || "Variable"
     };
 
@@ -1114,8 +1150,11 @@ export function executeParsedAction(actionType, data, successMessage) {
     const cOrigNombre = state.cuentas.find(c => c.id === cOrig)?.nombre || "Origen";
     const cDestNombre = state.cuentas.find(c => c.id === cDest)?.nombre || "Destino";
 
+    // v6: ambas piernas comparten transfer_id para editarse/borrarse en par
+    const gastoId = generateUniqueId();
+
     const txGasto = {
-      id: generateUniqueId(),
+      id: gastoId,
       fecha: fecha,
       tipo: "GASTO",
       categoria: "Transferencia",
@@ -1123,7 +1162,8 @@ export function executeParsedAction(actionType, data, successMessage) {
       monto: monto,
       cuenta_id: cOrig,
       tarjeta_id: null,
-      fijo: "Variable"
+      fijo: "Variable",
+      transfer_id: gastoId
     };
     state.transacciones.unshift(txGasto);
 
@@ -1136,7 +1176,8 @@ export function executeParsedAction(actionType, data, successMessage) {
       monto: monto,
       cuenta_id: cDest,
       tarjeta_id: null,
-      fijo: "Variable"
+      fijo: "Variable",
+      transfer_id: gastoId
     };
     state.transacciones.unshift(txIngreso);
     
@@ -1156,10 +1197,18 @@ export function executeParsedAction(actionType, data, successMessage) {
       return;
     }
 
+    const esTarjeta = rem.tipo === "Tarjeta";
+
+    // BUG-06: nunca asumir la tarjeta. Si el recordatorio de tarjeta no tiene
+    // tarjeta_id asociado, se pide usar el flujo manual (que sí pregunta cuál).
+    if (esTarjeta && !rem.tarjeta_id) {
+      showToast("Falta la tarjeta", `El recordatorio "${rem.nombre}" no tiene una tarjeta asociada. Págalo desde el botón "Pagar" del panel de recordatorios para elegirla.`, "error");
+      return;
+    }
+
     rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
     rem.estado = "Pendiente";
 
-    const esTarjeta = rem.tipo === "Tarjeta";
     const tx = {
       id: generateUniqueId(),
       fecha: new Date().toISOString().substring(0, 10),
@@ -1168,7 +1217,7 @@ export function executeParsedAction(actionType, data, successMessage) {
       descripcion: esTarjeta ? `Pago de Tarjeta ${rem.nombre}` : `Pago de servicio: ${rem.nombre}`,
       monto: monto,
       cuenta_id: esTarjeta ? null : ctaId,
-      tarjeta_id: esTarjeta ? parseInt(rem.tarjeta_id || 1) : null,
+      tarjeta_id: esTarjeta ? parseInt(rem.tarjeta_id) : null,
       fijo: esTarjeta ? "Variable" : "Fijo"
     };
 

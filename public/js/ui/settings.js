@@ -9,7 +9,7 @@ import {
   saveState,
   isLocalStorageMode
 } from '../state.js';
-import { safeCreateIcons, showToast } from './components.js';
+import { safeCreateIcons, showToast, escapeHTML, showConfirmModal } from './components.js';
 
 // Rellenar formulario de Ajustes con la configuración del estado
 export function populateConfigForm() {
@@ -71,7 +71,7 @@ export function renderCategoriesSettings() {
       actionHTML = `<span style="font-size: 0.75rem; color: var(--text-muted); background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 6px; font-weight: 500;">Sistema</span>`;
     } else {
       actionHTML = `
-        <button class="btn-delete-category btn-icon" data-category="${cat}" style="color: var(--text-red); border: none; background: transparent; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;" title="Eliminar categoría">
+        <button class="btn-delete-category btn-icon" data-category="${escapeHTML(cat)}" style="color: var(--text-red); border: none; background: transparent; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px;" title="Eliminar categoría">
           <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
         </button>
       `;
@@ -82,7 +82,7 @@ export function renderCategoriesSettings() {
         <span class="category-badge-icon" style="background-color: ${estilo.bg}; color: ${estilo.color}; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
           <i data-lucide="${estilo.icon}" style="width: 16px; height: 16px;"></i>
         </span>
-        <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${cat}</span>
+        <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${escapeHTML(cat)}</span>
       </div>
       <div>${actionHTML}</div>
     `;
@@ -110,7 +110,13 @@ export function deleteCategory(categoryName) {
     return;
   }
 
-  if (confirm(`¿Estás seguro de que deseas eliminar la categoría "${categoryName}"?\n\nLas transacciones que usen esta categoría se reasignarán a "Otros" y los presupuestos asociados se eliminarán.`)) {
+  showConfirmModal({
+    title: "Eliminar categoría",
+    message: `¿Eliminar la categoría "${categoryName}"?\n\nLas transacciones que la usen se reasignarán a "Otros" y los presupuestos asociados se eliminarán.`,
+    confirmText: "Eliminar",
+    danger: true
+  }).then(ok => {
+    if (!ok) return;
     // 1. Reasignar transacciones a "Otros"
     let countTx = 0;
     state.transacciones.forEach(tx => {
@@ -134,9 +140,9 @@ export function deleteCategory(categoryName) {
     let msg = `Categoría "${categoryName}" eliminada con éxito.`;
     if (countTx > 0) msg += ` Se reasignaron ${countTx} transacciones a "Otros".`;
     if (countBudgets > 0) msg += ` Se eliminaron ${countBudgets} presupuestos asociados.`;
-    
+
     showToast("Categoría Eliminada", msg, "info");
-  }
+  });
 }
 
 // Configurar todos los listeners del módulo de ajustes
@@ -204,8 +210,14 @@ export function setupSettings() {
   // 3. Reiniciar BD
   const btnResetDb = document.getElementById("btn-reset-db");
   if (btnResetDb) {
-    btnResetDb.addEventListener("click", () => {
-      if (confirm("ATENCIÓN: Esto restablecerá los datos por defecto iniciales y borrará tu historial. ¿Estás COMPLETAMENTE seguro?")) {
+    btnResetDb.addEventListener("click", async () => {
+      const ok = await showConfirmModal({
+        title: "Reiniciar base de datos",
+        message: "ATENCIÓN: Esto restablecerá los datos por defecto iniciales y borrará tu historial de transacciones, presupuestos, metas y recordatorios. Esta acción no se puede deshacer.",
+        confirmText: "Sí, reiniciar todo",
+        danger: true
+      });
+      if (ok) {
         state.transacciones = [];
         state.presupuestos = [
           {"categoria": "Comida", "limite": 800.0},
@@ -392,8 +404,8 @@ export function renderAccountsSettings() {
           <i data-lucide="${c.tipo === 'Efectivo' ? 'wallet' : 'landmark'}" style="width: 16px; height: 16px;"></i>
         </span>
         <div style="display: flex; flex-direction: column;">
-          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${c.nombre}</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">${c.tipo} • Titular: ${c.titular}</span>
+          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${escapeHTML(c.nombre)}</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">${escapeHTML(c.tipo)} • Titular: ${escapeHTML(c.titular)}</span>
         </div>
       </div>
       <div>
@@ -441,8 +453,8 @@ export function renderCardsSettings() {
           <i data-lucide="credit-card" style="width: 16px; height: 16px;"></i>
         </span>
         <div style="display: flex; flex-direction: column;">
-          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${t.nombre}</span>
-          <span style="font-size: 0.75rem; color: var(--text-muted);">Crédito • Titular: ${t.titular}</span>
+          <span style="font-weight: 600; color: var(--text-main); font-size: 0.9rem;">${escapeHTML(t.nombre)}</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">Crédito • Titular: ${escapeHTML(t.titular)}</span>
         </div>
       </div>
       <div>
@@ -475,11 +487,18 @@ export function deleteAccount(id) {
   }
 
   const c = state.cuentas.find(item => parseInt(item.id) === id);
-  if (c && confirm(`¿Estás seguro de que deseas eliminar la cuenta "${c.nombre}"?`)) {
+  if (!c) return;
+  showConfirmModal({
+    title: "Eliminar cuenta",
+    message: `¿Eliminar la cuenta "${c.nombre}"?`,
+    confirmText: "Eliminar",
+    danger: true
+  }).then(ok => {
+    if (!ok) return;
     state.cuentas = state.cuentas.filter(item => parseInt(item.id) !== id);
     saveState();
     showToast("Cuenta eliminada", `La cuenta "${c.nombre}" fue eliminada correctamente.`, "success");
-  }
+  });
 }
 
 // Eliminar tarjeta de crédito
@@ -491,9 +510,16 @@ export function deleteCard(id) {
   }
 
   const t = state.tarjetas.find(item => parseInt(item.id) === id);
-  if (t && confirm(`¿Estás seguro de que deseas eliminar la tarjeta "${t.nombre}"?`)) {
+  if (!t) return;
+  showConfirmModal({
+    title: "Eliminar tarjeta",
+    message: `¿Eliminar la tarjeta "${t.nombre}"?`,
+    confirmText: "Eliminar",
+    danger: true
+  }).then(ok => {
+    if (!ok) return;
     state.tarjetas = state.tarjetas.filter(item => parseInt(item.id) !== id);
     saveState();
     showToast("Tarjeta eliminada", `La tarjeta "${t.nombre}" fue eliminada correctamente.`, "success");
-  }
+  });
 }

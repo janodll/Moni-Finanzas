@@ -1,8 +1,8 @@
 // Gestión y Renderizado de Reportes Financieros Dinámicos de Moni
 
 import { state } from '../state.js';
-import { formatNumber, formatDateStr } from '../calculations.js';
-import { safeCreateIcons } from './components.js';
+import { formatNumber, formatDateStr, getMontoEnSoles } from '../calculations.js';
+import { safeCreateIcons, escapeHTML } from './components.js';
 import { getOrigenLabel } from './dashboard.js';
 
 // Configurar dropdown de meses e inicializar eventos
@@ -54,9 +54,10 @@ export function renderMonthlyReport(monthKey) {
   let variables = 0;
   const porCategoria = {};
 
+  const tc = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
   txs.forEach(tx => {
-    const monto = parseFloat(tx.monto) || 0;
-    
+    const monto = getMontoEnSoles(tx, tc);
+
     // Excluir transferencias internas y saldos iniciales de los totales
     if (tx.categoria !== "Pago Tarjeta" && tx.categoria !== "Transferencia" && tx.categoria !== "Saldo Inicial" && tx.categoria !== "Deuda Inicial") {
       if (tx.tipo === "INGRESO") {
@@ -121,7 +122,7 @@ export function renderMonthlyReport(monthKey) {
         </div>
         <div style="text-align:right;">
           <h4 style="font-size:1.2rem; color:var(--color-indigo); font-weight:700; margin:0;">Moni Finance</h4>
-          <small class="text-muted">Propietario: ${state.configuracion?.nombre_usuario || 'Jano'}</small>
+          <small class="text-muted">Propietario: ${escapeHTML(state.configuracion?.nombre_usuario || 'Jano')}</small>
         </div>
       </div>
 
@@ -164,7 +165,7 @@ export function renderMonthlyReport(monthKey) {
                   return `
                     <div>
                       <div style="display:flex; justify-content:space-between; font-size:0.85rem; font-weight:600; margin-bottom:4px;">
-                        <span>${idx + 1}. ${cat.name}</span>
+                        <span>${idx + 1}. ${escapeHTML(cat.name)}</span>
                         <span>${mon} ${formatNumber(cat.value)} (${pct}%)</span>
                       </div>
                       <div class="progress-bar" style="height:6px;">
@@ -226,11 +227,11 @@ export function renderMonthlyReport(monthKey) {
                     return `
                       <tr style="border-bottom:1px solid var(--border-color);">
                         <td style="padding:8px 10px;">${formatDateStr(tx.fecha)}</td>
-                        <td style="padding:8px 10px; font-weight:600;">${tx.categoria}</td>
-                        <td style="padding:8px 10px;" class="text-muted">${tx.descripcion || 'Sin descripción'}</td>
-                        <td style="padding:8px 10px;">${getOrigenLabel(tx)}</td>
+                        <td style="padding:8px 10px; font-weight:600;">${escapeHTML(tx.categoria)}</td>
+                        <td style="padding:8px 10px;" class="text-muted">${escapeHTML(tx.descripcion) || 'Sin descripción'}</td>
+                        <td style="padding:8px 10px;">${escapeHTML(getOrigenLabel(tx))}</td>
                         <td style="padding:8px 10px; text-align:right; font-weight:700; color:${esGasto ? 'var(--color-red)' : 'var(--color-green)'};">
-                          ${esGasto ? '-' : '+'}${mon} ${formatNumber(tx.monto)}
+                          ${esGasto ? '-' : '+'}${tx.moneda === "US$" ? "US$" : mon} ${formatNumber(tx.monto)}
                         </td>
                       </tr>
                     `;

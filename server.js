@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,12 +15,17 @@ const DATA_FILE = path.join(__dirname, 'datos.json');
 app.use(cors({
   origin: ['http://localhost:3001', 'http://127.0.0.1:3001']
 }));
-app.use(express.json());
+// Límite ampliado: el estado financiero completo puede superar los 100kb por defecto de Express
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/reportes', express.static(path.join(__dirname, 'reportes')));
 
-// Token local estático básico para proteger la API (configurable por variable de entorno)
-const LOCAL_TOKEN = process.env.LOCAL_API_TOKEN || 'moni-local-token-secure-2026';
+// Token local para proteger la API (configurable por variable de entorno).
+// SEC-05: Si no se define LOCAL_API_TOKEN, se genera un token aleatorio por arranque.
+// El frontend lo obtiene automáticamente vía /api/session-token (solo localhost),
+// por lo que en uso local el cambio es transparente. Para despliegues remotos
+// (Railway, etc.) definir LOCAL_API_TOKEN como variable de entorno fija.
+const LOCAL_TOKEN = process.env.LOCAL_API_TOKEN || crypto.randomUUID();
 
 function requireLocalAuth(req, res, next) {
   const token = req.headers['x-local-token'];
@@ -65,27 +71,39 @@ app.get('/api/data', requireLocalAuth, (req, res) => {
 // Guardar datos
 app.post('/api/data', requireLocalAuth, (req, res) => {
   const newData = req.body;
-  
+
   if (!newData || typeof newData !== 'object') {
     return res.status(400).json({ error: "Datos inválidos." });
   }
 
-  // Backup automático antes de sobreescribir datos.json
+  // RIESGO-02 (a): backups rotativos de 3 generaciones.
+  // .backup.1 es el más reciente; cada guardado desplaza 1->2->3.
   try {
     if (fs.existsSync(DATA_FILE)) {
-      fs.copyFileSync(DATA_FILE, DATA_FILE + '.backup');
+      for (let i = 2; i >= 1; i--) {
+        const src = `${DATA_FILE}.backup.${i}`;
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, `${DATA_FILE}.backup.${i + 1}`);
+        }
+      }
+      fs.copyFileSync(DATA_FILE, `${DATA_FILE}.backup.1`);
     }
   } catch (backupErr) {
-    console.error("Error al crear copia de seguridad de datos.json:", backupErr);
+    console.error("Error al rotar copias de seguridad de datos.json:", backupErr);
   }
 
-  fs.writeFile(DATA_FILE, JSON.stringify(newData, null, 2), 'utf8', (err) => {
-    if (err) {
-      console.error("Error al escribir en datos.json:", err);
-      return res.status(500).json({ error: "No se pudo guardar la información." });
-    }
+  // RIESGO-02 (b): escritura atómica — se escribe a un archivo temporal y
+  // se renombra. El rename es atómico: datos.json nunca queda a medias.
+  const tmpFile = DATA_FILE + '.tmp';
+  try {
+    fs.writeFileSync(tmpFile, JSON.stringify(newData, null, 2), 'utf8');
+    fs.renameSync(tmpFile, DATA_FILE);
     res.json({ ok: true, message: "Datos guardados correctamente." });
-  });
+  } catch (err) {
+    console.error("Error al escribir en datos.json:", err);
+    try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (e) {}
+    res.status(500).json({ error: "No se pudo guardar la información." });
+  }
 });
 
 // Endpoint de NLP Híbrido (Gemini o Kimi/Moonshot)
@@ -142,6 +160,7 @@ REGLAS DE PROCESAMIENTO:
        "tipo": "GASTO" o "INGRESO",
        "fecha": "YYYY-MM-DD",  // Usa la fecha indicada por el usuario, o hoy (${new Date().toISOString().split('T')[0]}) si no se especifica
        "monto": <monto numérico real extraído>,
+       "moneda": "S/." o "US$" (usa "US$" SOLO si el usuario indica explícitamente dólares; por defecto "S/."),
        "categoria": "Comida/Transporte/Servicios/Vivienda/Educación/Entretenimiento/Pago Tarjeta/Transferencia/Ahorro/Otros",
        "descripcion": "<Descripción detallada del movimiento>",
        "cuenta_id": <ID numérico de la cuenta real de state.cuentas, o null si es tarjeta de crédito>,
@@ -307,9 +326,17 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
+// SEC-05: Por defecto solo se escucha en loopback (127.0.0.1) para no exponer
+// los datos financieros a la red local. Para despliegues remotos definir HOST=0.0.0.0.
+const HOST = process.env.HOST || '127.0.0.1';
+
+app.listen(PORT, HOST, () => {
   console.log(`==================================================`);
   console.log(` Servidor de Finanzas levantado en: http://localhost:${PORT}`);
+  console.log(` Escuchando solo en: ${HOST}`);
+  if (!process.env.LOCAL_API_TOKEN) {
+    console.log(` Token de sesión (generado este arranque): ${LOCAL_TOKEN}`);
+  }
   console.log(` Presiona Ctrl+C para detener el servidor`);
   console.log(`==================================================`);
 });

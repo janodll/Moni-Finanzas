@@ -50,6 +50,15 @@ import {
   renderMonthlyReport 
 } from './ui/reports.js';
 
+// PWA: registrar Service Worker (solo sobre http/https; no en file://)
+if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => {
+      console.warn('No se pudo registrar el Service Worker:', err);
+    });
+  });
+}
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener("DOMContentLoaded", async () => {
   // Inicializar la autenticación local (carga de token)
@@ -399,6 +408,7 @@ export function setupFormSubmits() {
       const tipo = document.getElementById("tx-tipo").value;
       const fecha = document.getElementById("tx-fecha").value;
       const monto = parseFloat(document.getElementById("tx-monto").value);
+      const moneda = document.getElementById("tx-moneda")?.value || "S/.";
       const categoria = document.getElementById("tx-categoria").value;
       const descripcion = document.getElementById("tx-descripcion").value;
       const fijo = document.getElementById("tx-fijo").value;
@@ -419,6 +429,7 @@ export function setupFormSubmits() {
           tx.tipo = tipo;
           tx.fecha = fecha;
           tx.monto = monto;
+          tx.moneda = moneda;
           tx.categoria = categoria;
           tx.descripcion = descripcion;
           tx.cuenta_id = cuenta_id;
@@ -434,6 +445,7 @@ export function setupFormSubmits() {
           categoria,
           descripcion,
           monto,
+          moneda,
           tarjeta_id,
           cuenta_id,
           fijo
@@ -468,8 +480,11 @@ export function setupFormSubmits() {
       const cOrigNombre = cOrigCta ? cOrigCta.nombre : "Origen";
       const cDestNombre = cDestCta ? cDestCta.nombre : "Destino";
 
+      // v6: ambas piernas comparten transfer_id para editarse/borrarse en par
+      const gastoId = generateUniqueId();
+
       const txGasto = {
-        id: generateUniqueId(),
+        id: gastoId,
         fecha,
         tipo: "GASTO",
         categoria: "Transferencia",
@@ -477,7 +492,8 @@ export function setupFormSubmits() {
         monto,
         tarjeta_id: null,
         cuenta_id: cOrig,
-        fijo: "Variable"
+        fijo: "Variable",
+        transfer_id: gastoId
       };
       state.transacciones.unshift(txGasto);
 
@@ -490,7 +506,8 @@ export function setupFormSubmits() {
         monto,
         tarjeta_id: null,
         cuenta_id: cDest,
-        fijo: "Variable"
+        fijo: "Variable",
+        transfer_id: gastoId
       };
       state.transacciones.unshift(txIngreso);
       document.getElementById("modal-transferencia").classList.remove("active");

@@ -178,10 +178,18 @@ export async function fetchData() {
     if (response.status === 401) {
       console.warn("Token local incorrecto o expirado.");
       localStorage.removeItem("MONI_LOCAL_TOKEN");
-      
-      const userToken = prompt("Acceso Protegido\n\nIngresa el Token de Acceso Local de tu servidor para ver tus finanzas:");
+
+      // v6: modal propio en lugar de prompt() nativo
+      const { showInputModal } = await import('./ui/components.js');
+      const userToken = await showInputModal({
+        title: "Acceso Protegido",
+        message: "Ingresa el Token de Acceso Local de tu servidor para ver tus finanzas (aparece en la consola del servidor al arrancar).",
+        placeholder: "Token de acceso",
+        confirmText: "Conectar",
+        type: "password"
+      });
       if (userToken) {
-        LOCAL_TOKEN = userToken.trim();
+        LOCAL_TOKEN = userToken;
         localStorage.setItem("MONI_LOCAL_TOKEN", LOCAL_TOKEN);
         return fetchData(); // Reintentar con el nuevo token
       } else {
