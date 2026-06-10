@@ -67,6 +67,34 @@ app.get('/api/session-token', (req, res) => {
   res.json({ token: LOCAL_TOKEN });
 });
 
+// Función auxiliar para guardar datos en el espejo local datos.json de forma segura y atómica
+function saveLocalDataSync(newData) {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      for (let i = 2; i >= 1; i--) {
+        const src = `${DATA_FILE}.backup.${i}`;
+        if (fs.existsSync(src)) {
+          fs.copyFileSync(src, `${DATA_FILE}.backup.${i + 1}`);
+        }
+      }
+      fs.copyFileSync(DATA_FILE, `${DATA_FILE}.backup.1`);
+    }
+  } catch (backupErr) {
+    console.error("Error al rotar copias de seguridad de datos.json:", backupErr);
+  }
+
+  const tmpFile = DATA_FILE + '.tmp';
+  try {
+    fs.writeFileSync(tmpFile, JSON.stringify(newData, null, 2), 'utf8');
+    fs.renameSync(tmpFile, DATA_FILE);
+    return true;
+  } catch (err) {
+    console.error("Error al escribir en datos.json:", err);
+    try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (e) {}
+    return false;
+  }
+}
+
 // Obtener datos
 app.get('/api/data', requireLocalAuth, async (req, res) => {
   if (SUPABASE_URL && SUPABASE_KEY) {
@@ -80,7 +108,10 @@ app.get('/api/data', requireLocalAuth, async (req, res) => {
       if (response.ok) {
         const json = await response.json();
         if (json && json.length > 0) {
-          return res.json(json[0].data);
+          const cloudData = json[0].data;
+          // Actualizar el espejo local datos.json silenciosamente con la versión de la nube
+          saveLocalDataSync(cloudData);
+          return res.json(cloudData);
         }
       }
       console.warn(`[Supabase] No se encontraron datos o error de respuesta (${response.status}). Usando fallback local.`);
@@ -129,7 +160,9 @@ app.post('/api/data', requireLocalAuth, async (req, res) => {
         })
       });
       if (response.ok) {
-        return res.json({ ok: true, message: "Datos guardados correctamente en la nube (Supabase)." });
+        // Guardar espejo local en el disco
+        saveLocalDataSync(newData);
+        return res.json({ ok: true, message: "Datos guardados correctamente en la nube (Supabase) y espejo local." });
       }
       console.error(`[Supabase] Error al guardar en la nube (status: ${response.status}). Usando fallback local.`);
     } catch (dbErr) {
@@ -137,34 +170,12 @@ app.post('/api/data', requireLocalAuth, async (req, res) => {
     }
   }
 
-  // Fallback local
-  // RIESGO-02 (a): backups rotativos de 3 generaciones.
-  // .backup.1 es el más reciente; cada guardado desplaza 1->2->3.
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      for (let i = 2; i >= 1; i--) {
-        const src = `${DATA_FILE}.backup.${i}`;
-        if (fs.existsSync(src)) {
-          fs.copyFileSync(src, `${DATA_FILE}.backup.${i + 1}`);
-        }
-      }
-      fs.copyFileSync(DATA_FILE, `${DATA_FILE}.backup.1`);
-    }
-  } catch (backupErr) {
-    console.error("Error al rotar copias de seguridad de datos.json:", backupErr);
-  }
-
-  // RIESGO-02 (b): escritura atómica — se escribe a un archivo temporal y
-  // se renombra. El rename es atómico: datos.json nunca queda a medias.
-  const tmpFile = DATA_FILE + '.tmp';
-  try {
-    fs.writeFileSync(tmpFile, JSON.stringify(newData, null, 2), 'utf8');
-    fs.renameSync(tmpFile, DATA_FILE);
-    res.json({ ok: true, message: "Datos guardados correctamente." });
-  } catch (err) {
-    console.error("Error al escribir en datos.json:", err);
-    try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (e) {}
-    res.status(500).json({ error: "No se pudo guardar la información." });
+  // Fallback local puro
+  const success = saveLocalDataSync(newData);
+  if (success) {
+    res.json({ ok: true, message: "Datos guardados correctamente en local." });
+  } else {
+    res.status(500).json({ error: "No se pudo guardar la información local." });
   }
 });
 
