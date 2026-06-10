@@ -18,20 +18,21 @@ export const COLOR_PALETTES = {
 };
 
 export const DEFAULT_CATEGORY_STYLES = {
-  "Comida": { icon: "utensils", color: "#F59E0B", bg: "#FEF3C7" },
-  "Transporte": { icon: "car", color: "#3B82F6", bg: "#EFF6FF" },
-  "Servicios": { icon: "lightbulb", color: "#EF4444", bg: "#FFF1F2" },
-  "Vivienda": { icon: "home", color: "#0D9488", bg: "#F0FDFA" },
-  "Educación": { icon: "graduation-cap", color: "#D946EF", bg: "#FDF4FF" },
-  "Entretenimiento": { icon: "party-popper", color: "#8B5CF6", bg: "#F5F3FF" },
-  "Sueldo": { icon: "banknote", color: "#10B981", bg: "#ECFDF5" },
-  "Pago Tarjeta": { icon: "credit-card", color: "#6366F1", bg: "#EEF2FF" },
-  "Transferencia": { icon: "repeat", color: "#6B7280", bg: "#F3F4F6" },
-  "Ahorro": { icon: "piggy-bank", color: "#EC4899", bg: "#FCE7F3" },
-  "Mascotas": { icon: "paw-print", color: "#EC4899", bg: "#FCE7F3" },
-  "Saldo Inicial": { icon: "wallet", color: "#10B981", bg: "#ECFDF5" },
-  "Deuda Inicial": { icon: "shield-alert", color: "#EF4444", bg: "#FFF1F2" },
-  "Otros": { icon: "help-circle", color: "#6B7280", bg: "#F3F4F6" }
+  "Comida": { icon: "utensils", color: "#F59E0B", bg: "#FEF3C7", tipo: "GASTO" },
+  "Transporte": { icon: "car", color: "#3B82F6", bg: "#EFF6FF", tipo: "GASTO" },
+  "Servicios": { icon: "lightbulb", color: "#EF4444", bg: "#FFF1F2", tipo: "GASTO" },
+  "Vivienda": { icon: "home", color: "#0D9488", bg: "#F0FDFA", tipo: "GASTO" },
+  "Educación": { icon: "graduation-cap", color: "#D946EF", bg: "#FDF4FF", tipo: "GASTO" },
+  "Entretenimiento": { icon: "party-popper", color: "#8B5CF6", bg: "#F5F3FF", tipo: "GASTO" },
+  "Sueldo": { icon: "banknote", color: "#10B981", bg: "#ECFDF5", tipo: "INGRESO" },
+  "Pago Tarjeta": { icon: "credit-card", color: "#6366F1", bg: "#EEF2FF", tipo: "SISTEMA" },
+  "Transferencia": { icon: "repeat", color: "#6B7280", bg: "#F3F4F6", tipo: "SISTEMA" },
+  "Ahorro": { icon: "piggy-bank", color: "#EC4899", bg: "#FCE7F3", tipo: "GASTO" },
+  "Mascotas": { icon: "paw-print", color: "#EC4899", bg: "#FCE7F3", tipo: "GASTO" },
+  "Saldo Inicial": { icon: "wallet", color: "#10B981", bg: "#ECFDF5", tipo: "SISTEMA" },
+  "Deuda Inicial": { icon: "shield-alert", color: "#EF4444", bg: "#FFF1F2", tipo: "SISTEMA" },
+  "Otros": { icon: "help-circle", color: "#6B7280", bg: "#F3F4F6", tipo: "AMBOS" },
+  "Salud": { icon: "heart-pulse", color: "#8B5CF6", bg: "#F5F3FF", tipo: "GASTO" }
 };
 
 export let CATEGORY_STYLES = { ...DEFAULT_CATEGORY_STYLES };

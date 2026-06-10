@@ -170,6 +170,7 @@ export function setupSettings() {
       const nameInput = document.getElementById("cat-nuevo-nombre");
       const colorSelect = document.getElementById("cat-nuevo-color");
       const iconSelect = document.getElementById("cat-nuevo-icono");
+      const tipoSelect = document.getElementById("cat-nuevo-tipo");
 
       if (!nameInput || !colorSelect || !iconSelect) return;
 
@@ -177,6 +178,7 @@ export function setupSettings() {
       const name = rawName.charAt(0).toUpperCase() + rawName.slice(1);
       const colorKey = colorSelect.value;
       const icon = iconSelect.value;
+      const tipo = tipoSelect ? tipoSelect.value : "GASTO";
 
       if (!name) {
         showToast("Nombre inválido", "Por favor introduce un nombre válido para la categoría.", "error");
@@ -196,7 +198,8 @@ export function setupSettings() {
       CATEGORY_STYLES[name] = {
         icon: icon,
         color: palette.color,
-        bg: palette.bg
+        bg: palette.bg,
+        tipo: tipo
       };
 
       // Limpiar formulario y guardar

@@ -4,7 +4,7 @@ import { state, CATEGORY_STYLES, setEditingTransactionId, saveState } from '../s
 import { formatNumber, formatDateStr, getCurrentMonthString, getMontoEnSoles } from '../calculations.js';
 import { safeCreateIcons, escapeHTML, showUndoToast } from './components.js';
 import { getOrigenLabel } from './dashboard.js';
-import { populateFormSelects } from '../main.js';
+import { populateFormSelects, filterCategorySelect } from '../main.js';
 
 export const pagination = {
   currentPage: 1,
@@ -395,6 +395,10 @@ export function openEditTransactionModal(id) {
   document.getElementById("tx-monto").value = tx.monto;
   const monedaSelect = document.getElementById("tx-moneda");
   if (monedaSelect) monedaSelect.value = tx.moneda === "US$" ? "US$" : "S/.";
+  
+  // Filtrar categorías según el tipo de transacción antes de asignar el valor
+  filterCategorySelect(document.getElementById("tx-categoria"), tx.tipo);
+  
   document.getElementById("tx-categoria").value = tx.categoria;
   document.getElementById("tx-descripcion").value = tx.descripcion || "";
   document.getElementById("tx-fijo").value = tx.fijo || "Variable";

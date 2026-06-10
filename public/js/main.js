@@ -152,7 +152,18 @@ export function setupModalEvents() {
       document.getElementById("form-transaccion").reset();
       document.getElementById("tx-fecha").valueAsDate = new Date();
       
+      // Filtrar a GASTO inicialmente
+      filterCategorySelect(document.getElementById("tx-categoria"), "GASTO");
+      
       modalTx.classList.add("active");
+    });
+  }
+
+  // Escuchar cambio de tipo (Gasto / Ingreso) para actualizar categorías dinámicamente
+  const txTipoSelect = document.getElementById("tx-tipo");
+  if (txTipoSelect) {
+    txTipoSelect.addEventListener("change", (e) => {
+      filterCategorySelect(document.getElementById("tx-categoria"), e.target.value);
     });
   }
   
@@ -303,11 +314,24 @@ export function setupQuickBatch() {
     monto.className = "form-control batch-monto";
     monto.addEventListener("input", updateSummary);
 
-    const catOptions = Object.keys(CATEGORY_STYLES)
-      .filter(c => c !== "Saldo Inicial" && c !== "Deuda Inicial")
-      .map(c => [c, c]);
-    const categoria = mkSelect("batch-categoria", catOptions);
-    categoria.value = "Comida";
+    const categoria = document.createElement("select");
+    categoria.className = "form-control batch-categoria";
+
+    const updateBatchCatSelect = (tVal) => {
+      filterCategorySelect(categoria, tVal);
+      if (tVal === "GASTO") {
+        if (categoria.querySelector("option[value='Comida']")) categoria.value = "Comida";
+      } else if (tVal === "INGRESO") {
+        if (categoria.querySelector("option[value='Sueldo']")) categoria.value = "Sueldo";
+      }
+    };
+
+    tipo.addEventListener("change", (e) => {
+      updateBatchCatSelect(e.target.value);
+    });
+
+    // Inicializar la fila en GASTO por defecto
+    updateBatchCatSelect("GASTO");
 
     const origenOptions = [
       ...state.cuentas.map(c => [`cta-${c.id}`, `[Cta] ${c.nombre}`]),
@@ -400,6 +424,39 @@ export function setupQuickBatch() {
   }
 }
 
+// Filtrar dinámicamente un select de categorías según el tipo de transacción (Gasto o Ingreso)
+export function filterCategorySelect(selectEl, transactionType) {
+  if (!selectEl) return;
+  const prevVal = selectEl.value;
+  selectEl.innerHTML = "";
+
+  Object.keys(CATEGORY_STYLES).forEach(cat => {
+    const estilo = CATEGORY_STYLES[cat];
+    let catTipo = estilo.tipo;
+    if (!catTipo) {
+      if (cat === "Sueldo") catTipo = "INGRESO";
+      else if (["Saldo Inicial", "Deuda Inicial", "Pago Tarjeta", "Transferencia"].includes(cat)) catTipo = "SISTEMA";
+      else if (cat === "Otros") catTipo = "AMBOS";
+      else catTipo = "GASTO";
+    }
+
+    const match = 
+      (transactionType === "GASTO" && (catTipo === "GASTO" || catTipo === "AMBOS")) ||
+      (transactionType === "INGRESO" && (catTipo === "INGRESO" || catTipo === "AMBOS"));
+
+    if (match) {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.text = cat;
+      selectEl.appendChild(opt);
+    }
+  });
+
+  if (prevVal && selectEl.querySelector(`option[value="${prevVal}"]`)) {
+    selectEl.value = prevVal;
+  }
+}
+
 // Rellenar selectores de cuentas y categorías en formularios dinámicos
 export function populateFormSelects() {
   const txOrigenSelect = document.getElementById("tx-origen");
@@ -431,19 +488,8 @@ export function populateFormSelects() {
 
   const txCatSelect = document.getElementById("tx-categoria");
   if (txCatSelect) {
-    const prevVal = txCatSelect.value;
-    txCatSelect.innerHTML = "";
-    Object.keys(CATEGORY_STYLES).forEach(cat => {
-      if (cat !== "Saldo Inicial" && cat !== "Deuda Inicial") {
-        const opt = document.createElement("option");
-        opt.value = cat;
-        opt.text = cat;
-        txCatSelect.appendChild(opt);
-      }
-    });
-    if (prevVal && CATEGORY_STYLES[prevVal]) {
-      txCatSelect.value = prevVal;
-    }
+    const txTipo = document.getElementById("tx-tipo")?.value || "GASTO";
+    filterCategorySelect(txCatSelect, txTipo);
   }
 
   const budgetCatSelect = document.getElementById("budget-category");
