@@ -11,6 +11,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json');
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
 app.use(cors({
   origin: ['http://localhost:3001', 'http://127.0.0.1:3001']
@@ -57,7 +59,28 @@ app.get('/api/session-token', (req, res) => {
 });
 
 // Obtener datos
-app.get('/api/data', requireLocalAuth, (req, res) => {
+app.get('/api/data', requireLocalAuth, async (req, res) => {
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?select=data&id=eq.1`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+      if (response.ok) {
+        const json = await response.json();
+        if (json && json.length > 0) {
+          return res.json(json[0].data);
+        }
+      }
+      console.warn(`[Supabase] No se encontraron datos o error de respuesta (${response.status}). Usando fallback local.`);
+    } catch (dbErr) {
+      console.error("[Supabase] Error al leer desde la nube, usando fallback local:", dbErr);
+    }
+  }
+
+  // Fallback local
   fs.readFile(DATA_FILE, 'utf8', (err, data) => {
     if (err) {
       console.error("Error al leer datos.json:", err);
@@ -74,13 +97,38 @@ app.get('/api/data', requireLocalAuth, (req, res) => {
 });
 
 // Guardar datos
-app.post('/api/data', requireLocalAuth, (req, res) => {
+app.post('/api/data', requireLocalAuth, async (req, res) => {
   const newData = req.body;
 
   if (!newData || typeof newData !== 'object') {
     return res.status(400).json({ error: "Datos inválidos." });
   }
 
+  if (SUPABASE_URL && SUPABASE_KEY) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?id=eq.1`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify({
+          data: newData,
+          updated_at: new Date().toISOString()
+        })
+      });
+      if (response.ok) {
+        return res.json({ ok: true, message: "Datos guardados correctamente en la nube (Supabase)." });
+      }
+      console.error(`[Supabase] Error al guardar en la nube (status: ${response.status}). Usando fallback local.`);
+    } catch (dbErr) {
+      console.error("[Supabase] Error al guardar en la nube, usando fallback local:", dbErr);
+    }
+  }
+
+  // Fallback local
   // RIESGO-02 (a): backups rotativos de 3 generaciones.
   // .backup.1 es el más reciente; cada guardado desplaza 1->2->3.
   try {
