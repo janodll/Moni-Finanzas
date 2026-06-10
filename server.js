@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DATA_FILE = path.join(__dirname, 'datos.json');
+const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json');
 
 app.use(cors({
   origin: ['http://localhost:3001', 'http://127.0.0.1:3001']
