@@ -191,10 +191,8 @@ app.get('/api/data', requireLocalAuth, async (req, res) => {
           // Caso A: Los cambios locales en datos.json son más nuevos (ocurrieron offline)
           if (localTime > cloudTime && localData) {
             console.log(`[Sync] Datos locales son más recientes (${localUpdatedAt} > ${cloudUpdatedAt}). Subiendo a Supabase...`);
-            const ok = await uploadToSupabase(localData);
-            if (ok) {
-              return res.json(localData);
-            }
+            await uploadToSupabase(localData);
+            return res.json(localData); // Retornar siempre lo local (es el más nuevo)
           } 
           
           // Caso B: Los cambios en la nube son más nuevos o iguales. Sincronizar hacia abajo (espejo)
