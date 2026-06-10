@@ -38,8 +38,10 @@ const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
-// Habilitar trust proxy para detectar correctamente la IP del cliente detrás de proxies (como Render)
-app.set('trust proxy', true);
+// Habilitar trust proxy solo cuando corremos en Render (detrás de su proxy reverso)
+if (process.env.RENDER === 'true') {
+  app.set('trust proxy', true);
+}
 
 
 app.use(cors({
@@ -119,11 +121,59 @@ function saveLocalDataSync(newData) {
   }
 }
 
+// Función auxiliar para subir el estado completo a Supabase usando un UPSERT (POST) robusto
+async function uploadToSupabase(data) {
+  if (!data.updated_at) {
+    data.updated_at = new Date().toISOString();
+  }
+  try {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates' // UPSERT en PostgREST
+      },
+      body: JSON.stringify({
+        id: 1,
+        data: data,
+        updated_at: data.updated_at
+      })
+    });
+    if (!response.ok) {
+      const errTxt = await response.text();
+      console.error(`[Supabase] Error al subir datos (${response.status}):`, errTxt);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("[Supabase] Excepción al subir datos a la nube:", err);
+    return false;
+  }
+}
+
 // Obtener datos
 app.get('/api/data', requireLocalAuth, async (req, res) => {
+  let localData = null;
+  let localUpdatedAt = new Date(0).toISOString();
+
+  // 1. Leer el estado local (si existe) y obtener su fecha de actualización
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const dataStr = fs.readFileSync(DATA_FILE, 'utf8');
+      localData = JSON.parse(dataStr);
+      // Fallback a la fecha de modificación del archivo físico si el JSON no tiene fecha
+      localUpdatedAt = localData.updated_at || fs.statSync(DATA_FILE).mtime.toISOString();
+    }
+  } catch (err) {
+    console.error("Error al leer datos.json local en arranque:", err);
+  }
+
+  // 2. Si Supabase está configurado, sincronizar comparando fechas
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?select=data&id=eq.1`, {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?select=data,updated_at&id=eq.1`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -133,18 +183,43 @@ app.get('/api/data', requireLocalAuth, async (req, res) => {
         const json = await response.json();
         if (json && json.length > 0) {
           const cloudData = json[0].data;
-          // Actualizar el espejo local datos.json silenciosamente con la versión de la nube
+          const cloudUpdatedAt = json[0].updated_at || new Date(0).toISOString();
+
+          const localTime = new Date(localUpdatedAt).getTime();
+          const cloudTime = new Date(cloudUpdatedAt).getTime();
+
+          // Caso A: Los cambios locales en datos.json son más nuevos (ocurrieron offline)
+          if (localTime > cloudTime && localData) {
+            console.log(`[Sync] Datos locales son más recientes (${localUpdatedAt} > ${cloudUpdatedAt}). Subiendo a Supabase...`);
+            const ok = await uploadToSupabase(localData);
+            if (ok) {
+              return res.json(localData);
+            }
+          } 
+          
+          // Caso B: Los cambios en la nube son más nuevos o iguales. Sincronizar hacia abajo (espejo)
+          if (cloudTime > localTime) {
+            console.log(`[Sync] Datos en la nube son más recientes (${cloudUpdatedAt} > ${localUpdatedAt}). Actualizando espejo local...`);
+          }
+          if (!cloudData.updated_at) {
+            cloudData.updated_at = cloudUpdatedAt;
+          }
           saveLocalDataSync(cloudData);
           return res.json(cloudData);
         }
       }
-      console.warn(`[Supabase] No se encontraron datos o error de respuesta (${response.status}). Usando fallback local.`);
+      console.warn(`[Supabase] No se encontró la fila id=1 o error (${response.status}). Usando fallback local.`);
     } catch (dbErr) {
-      console.error("[Supabase] Error al leer desde la nube, usando fallback local:", dbErr);
+      console.error("[Supabase] Error al sincronizar en lectura, usando fallback local:", dbErr);
     }
   }
 
-  // Fallback local
+  // Fallback local puro
+  if (localData) {
+    return res.json(localData);
+  }
+
+  // Si no hay datos de ningún tipo, retornar error
   fs.readFile(DATA_FILE, 'utf8', (err, data) => {
     if (err) {
       console.error("Error al leer datos.json:", err);
@@ -168,33 +243,19 @@ app.post('/api/data', requireLocalAuth, async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos." });
   }
 
+  // Estampar la fecha de actualización directamente en el JSON
+  newData.updated_at = new Date().toISOString();
+
   if (SUPABASE_URL && SUPABASE_KEY) {
-    try {
-      const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?id=eq.1`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': `Bearer ${SUPABASE_KEY}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'resolution=merge-duplicates'
-        },
-        body: JSON.stringify({
-          data: newData,
-          updated_at: new Date().toISOString()
-        })
-      });
-      if (response.ok) {
-        // Guardar espejo local en el disco
-        saveLocalDataSync(newData);
-        return res.json({ ok: true, message: "Datos guardados correctamente en la nube (Supabase) y espejo local." });
-      }
-      console.error(`[Supabase] Error al guardar en la nube (status: ${response.status}). Usando fallback local.`);
-    } catch (dbErr) {
-      console.error("[Supabase] Error al guardar en la nube, usando fallback local:", dbErr);
+    const success = await uploadToSupabase(newData);
+    if (success) {
+      saveLocalDataSync(newData);
+      return res.json({ ok: true, message: "Datos guardados correctamente en la nube (Supabase) y espejo local." });
     }
+    console.warn("[Supabase] Falló el guardado en la nube, usando fallback local.");
   }
 
-  // Fallback local puro
+  // Fallback local
   const success = saveLocalDataSync(newData);
   if (success) {
     res.json({ ok: true, message: "Datos guardados correctamente en local." });
