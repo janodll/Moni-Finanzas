@@ -8,6 +8,30 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Cargar variables de entorno desde .env local si existe (para uso local en la Mac)
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  try {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const firstEqual = trimmed.indexOf('=');
+        if (firstEqual !== -1) {
+          const key = trimmed.substring(0, firstEqual).trim();
+          const val = trimmed.substring(firstEqual + 1).trim().replace(/^['"]|['"]$/g, '');
+          if (key) {
+            process.env[key] = val;
+          }
+        }
+      }
+    });
+    console.log("[Entorno] Archivo .env cargado con éxito localmente.");
+  } catch (envErr) {
+    console.error("[Entorno] Error al leer el archivo .env:", envErr);
+  }
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json');
