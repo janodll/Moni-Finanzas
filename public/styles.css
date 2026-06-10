@@ -2029,3 +2029,199 @@ body {
 .metric-negative .metric-symbol {
   color: var(--color-red, #EF4444) !important;
 }
+
+/* ===== v6.4: Estilos para el modal de Registro Rápido (Lote) ===== */
+.batch-header-row {
+  display: grid;
+  grid-template-columns: 120px 96px 80px 100px 1fr 1fr 1.2fr 32px;
+  gap: 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 2px 6px 2px;
+  min-width: 820px;
+}
+.batch-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 820px;
+}
+.batch-row {
+  display: grid;
+  grid-template-columns: 120px 96px 80px 100px 1fr 1fr 1.2fr 32px;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ==================== MEJORAS DE DISEÑO Y UX MÓVIL (v6.4) ==================== */
+@media (max-width: 768px) {
+  /* 1. Cabecera y acciones principales */
+  .main-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px;
+  }
+  .header-welcome h1 {
+    font-size: 1.5rem;
+  }
+  .header-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    width: 100%;
+  }
+  .header-actions button:nth-child(3) {
+    grid-column: span 2;
+  }
+
+  /* 2. Historial de Transacciones (Responsive Cards) */
+  .table-responsive {
+    border: none;
+    overflow-x: visible; /* No scroll horizontal */
+  }
+  .table-responsive table.table-hover {
+    display: block;
+    width: 100%;
+  }
+  .table-responsive table.table-hover thead {
+    display: none; /* Ocultar cabeceras de tabla */
+  }
+  .table-responsive table.table-hover tbody {
+    display: block;
+    width: 100%;
+  }
+  .table-responsive table.table-hover tr {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    background: rgba(255, 255, 255, 0.45);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  .table-responsive table.table-hover td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: none !important;
+    padding: 4px 0 !important;
+    width: 100%;
+  }
+  /* Ocultar etiquetas/badges redundantes en la estructura visual de tarjeta móvil */
+  .table-responsive table.table-hover td:nth-child(2), /* Tipo Badge */
+  .table-responsive table.table-hover td:nth-child(6) { /* Fijo/Variable Badge */
+    display: none;
+  }
+  /* Dar estilo y orden a la información de la tarjeta */
+  .table-responsive table.table-hover td:nth-child(3) { /* Categoría */
+    order: 2;
+    font-weight: 600;
+  }
+  .table-responsive table.table-hover td:nth-child(4) { /* Descripción */
+    order: 3;
+    font-size: 0.95rem;
+    color: var(--text-main);
+  }
+  .table-responsive table.table-hover td:nth-child(5) { /* Origen */
+    order: 4;
+    font-size: 0.85rem;
+  }
+  .table-responsive table.table-hover td:nth-child(1) { /* Fecha */
+    order: 1;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+  .table-responsive table.table-hover td:nth-child(7) { /* Monto */
+    order: 5;
+    font-size: 1.25rem;
+    font-weight: 700;
+    justify-content: flex-end;
+    margin-top: 8px;
+    padding-top: 8px !important;
+    border-top: 1px dashed var(--border-color) !important;
+  }
+  .table-responsive table.table-hover td:nth-child(8) { /* Acciones */
+    order: 6;
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  /* 3. Targets táctiles más grandes para editar/borrar transacciones */
+  .btn-edit-tx, .btn-delete-tx {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px !important;
+    height: 44px !important;
+    border-radius: 50% !important;
+    background: rgba(255, 255, 255, 0.7) !important;
+    border: 1px solid var(--border-color) !important;
+    padding: 10px !important;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* 4. Modal de Registro Rápido (Lote) Responsivo */
+  .batch-header-row {
+    display: none !important;
+  }
+  .batch-rows-container {
+    min-width: auto !important;
+  }
+  .batch-row {
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-areas:
+      "fecha tipo"
+      "moneda monto"
+      "categoria origen"
+      "desc desc"
+      "del del" !important;
+    gap: 10px !important;
+    padding: 16px !important;
+    border: 1px dashed var(--border-color) !important;
+    border-radius: 16px !important;
+    background: rgba(255, 255, 255, 0.2) !important;
+    margin-bottom: 12px !important;
+  }
+  .batch-row .batch-fecha { grid-area: fecha; }
+  .batch-row .batch-tipo { grid-area: tipo; }
+  .batch-row .batch-moneda { grid-area: moneda; }
+  .batch-row .batch-monto { grid-area: monto; }
+  .batch-row .batch-categoria { grid-area: categoria; }
+  .batch-row .batch-origen { grid-area: origen; }
+  .batch-row .batch-desc { grid-area: desc; }
+  
+  .batch-row button {
+    grid-area: del;
+    width: 100% !important;
+    text-align: center !important;
+    background: rgba(239, 68, 68, 0.1) !important;
+    color: var(--text-red) !important;
+    padding: 10px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+    border: none !important;
+  }
+  .batch-row button::before {
+    content: "Quitar movimiento ";
+    margin-right: 4px;
+  }
+}
+
+/* 5. Tooltip táctil activo */
+.card-tooltip.active {
+  visibility: visible !important;
+  opacity: 1 !important;
+}

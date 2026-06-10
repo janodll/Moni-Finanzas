@@ -789,3 +789,22 @@ export function openCobrarModal(id) {
 
   document.getElementById("modal-cobrar-trabajo").classList.add("active");
 }
+
+// v6.4: Alternar visibilidad de tooltips de tarjetas en dispositivos móviles con click/tap
+document.addEventListener("click", (e) => {
+  const cardItem = e.target.closest(".card-item");
+  
+  // Cerrar otros tooltips activos si se toca fuera de ellos
+  document.querySelectorAll(".card-tooltip.active").forEach(el => {
+    if (!cardItem || el.closest(".card-item") !== cardItem) {
+      el.classList.remove("active");
+    }
+  });
+
+  if (cardItem) {
+    const tooltip = cardItem.querySelector(".card-tooltip");
+    if (tooltip) {
+      tooltip.classList.toggle("active");
+    }
+  }
+});

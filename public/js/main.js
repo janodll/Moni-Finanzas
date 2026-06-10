@@ -295,7 +295,6 @@ export function setupQuickBatch() {
   const createRow = () => {
     const row = document.createElement("div");
     row.className = "batch-row";
-    row.style.cssText = "display:grid; grid-template-columns:120px 96px 80px 100px 1fr 1fr 1.2fr 32px; gap:8px; align-items:center;";
 
     const fecha = document.createElement("input");
     fecha.type = "date";

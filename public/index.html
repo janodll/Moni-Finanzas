@@ -877,10 +877,10 @@
         Agrega una fila por movimiento y guarda todo de una sola vez. Las filas sin monto se ignoran.
       </p>
       <div style="overflow-x: auto;">
-        <div id="batch-rows-header" style="display: grid; grid-template-columns: 120px 96px 80px 100px 1fr 1fr 1.2fr 32px; gap: 8px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); padding: 0 2px 6px 2px; min-width: 820px;">
+        <div id="batch-rows-header" class="batch-header-row">
           <span>Fecha</span><span>Tipo</span><span>Moneda</span><span>Monto</span><span>Categoría</span><span>Cuenta/Tarjeta</span><span>Descripción</span><span></span>
         </div>
-        <div id="batch-rows-container" style="display: flex; flex-direction: column; gap: 8px; min-width: 820px;">
+        <div id="batch-rows-container" class="batch-rows-container">
           <!-- Filas dinámicas (JS) -->
         </div>
       </div>
