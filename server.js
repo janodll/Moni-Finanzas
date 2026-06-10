@@ -14,6 +14,10 @@ const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
+// Habilitar trust proxy para detectar correctamente la IP del cliente detrás de proxies (como Render)
+app.set('trust proxy', true);
+
+
 app.use(cors({
   origin: ['http://localhost:3001', 'http://127.0.0.1:3001']
 }));
@@ -45,6 +49,11 @@ function requireLocalAuth(req, res, next) {
 
 // Endpoint para obtener el token de sesión (solo accesible desde localhost)
 app.get('/api/session-token', (req, res) => {
+  // Si se configuró un token persistente para despliegue remoto, bloquear la obtención automática
+  if (process.env.LOCAL_API_TOKEN) {
+    return res.status(403).json({ error: "No disponible en producción/modo remoto." });
+  }
+
   const clientIp = req.ip || req.socket.remoteAddress;
   const isLocalhost = 
     clientIp.includes('127.0.0.1') || 
