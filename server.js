@@ -17,8 +17,13 @@ app.use(cors({
 }));
 // Límite ampliado: el estado financiero completo puede superar los 100kb por defecto de Express
 app.use(express.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/reportes', express.static(path.join(__dirname, 'reportes')));
+// v6: 'no-cache' obliga al navegador a revalidar con ETag en cada carga.
+// Sin esto, Chrome aplica caché heurística y puede servir JS viejo tras un cambio.
+const staticOpts = {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache')
+};
+app.use(express.static(path.join(__dirname, 'public'), staticOpts));
+app.use('/reportes', express.static(path.join(__dirname, 'reportes'), staticOpts));
 
 // Token local para proteger la API (configurable por variable de entorno).
 // SEC-05: Si no se define LOCAL_API_TOKEN, se genera un token aleatorio por arranque.

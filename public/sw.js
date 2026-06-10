@@ -1,5 +1,5 @@
 // Service Worker de Moni — cache de estáticos para uso offline/PWA
-const CACHE_NAME = 'moni-v1';
+const CACHE_NAME = 'moni-v2';
 
 const STATIC_ASSETS = [
   '/',
@@ -45,9 +45,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Estáticos propios: network-first con fallback a caché (evita servir
-  // versiones viejas tras un deploy, pero funciona offline)
+  // versiones viejas tras un deploy, pero funciona offline).
+  // cache:'no-cache' fuerza revalidación contra el servidor (ETag), evitando
+  // que el caché HTTP del navegador sirva archivos viejos al service worker.
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then(response => {
         if (response.ok && event.request.method === 'GET') {
           const clone = response.clone();

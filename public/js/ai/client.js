@@ -477,15 +477,21 @@ export function parseCommandLocal(text) {
   
   const palabras = lower.split(" ");
   let montoCandidato = null;
+  const montosDetectados = [];
   palabras.forEach(pal => {
     const match = pal.match(/^\d+(?:\.\d{1,2})?$/);
     if (match) {
       const num = parseFloat(match[0]);
       if (num !== 2026 && num !== 2025) {
         montoCandidato = num;
+        montosDetectados.push(num);
       }
     }
   });
+
+  // v6: si hay 2+ montos, es muy probable que sean varios movimientos en una
+  // sola frase — el motor local no sabe procesarlos; debe ir a la IA (batch)
+  res.multiMonto = montosDetectados.length >= 2;
 
   if (montoCandidato !== null) {
     res.monto = montoCandidato;
@@ -653,6 +659,13 @@ export function renderLocalPreview(parsed) {
     return;
   }
 
+  // v6: con varios montos, anticipar que será un registro en lote vía IA
+  if (parsed.multiMonto) {
+    panel.style.display = "flex";
+    content.innerHTML = `📦 <strong style="color:var(--color-indigo); margin-left:5px;">Varios movimientos detectados:</strong> al presionar Enter, la IA los separará y te mostrará una vista previa para confirmar el lote.`;
+    return;
+  }
+
   if (!parsed.monto) {
     panel.style.display = "none";
     return;
@@ -781,7 +794,14 @@ export async function executeCommand(commandText) {
   }
 
   // C) CONSULTAS CONVERSACIONALES O COMANDOS AMBIGUOS (Llamar a Gemini backend)
-  const esConversacional = parsed.action === "PREGUNTA" || !parsed.monto || parsed.confianza < 50;
+  // v6: los comandos con varios montos (posible lote) SIEMPRE van a la IA,
+  // aunque el NLP local tenga confianza alta — el motor local solo registra uno.
+  const esConversacional = parsed.action === "PREGUNTA" || !parsed.monto || parsed.confianza < 50 || parsed.multiMonto;
+
+  if (!apiKey && parsed.multiMonto) {
+    showToast("Varios movimientos detectados", "Para registrar varios de una sola frase necesitas activar la IA en Ajustes. Alternativa sin IA: usa el botón 'Registro Rápido' de la cabecera.", "warning");
+    return;
+  }
 
   if (apiKey && esConversacional) {
     if (terminalIcon) {
