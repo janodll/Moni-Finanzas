@@ -9,6 +9,7 @@ datos.json.tmp
 
 # Reportes personales con datos financieros reales
 reportes/
+Estados de cuenta/
 
 # Scripts de mantenimiento personal
 scratch/
@@ -22,3 +23,10 @@ CAMBIOS*.md
 
 # Local Netlify folder
 .netlify
+
+# Archivos de depuración y ejecución local
+*.log
+*.err
+*.command
+walkthrough.md
+
