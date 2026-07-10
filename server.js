@@ -973,20 +973,34 @@ No devuelvas nada más que el JSON limpio.
 
       try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: sysPrompt }] }],
-            generationConfig: { responseMimeType: "application/json" }
-          })
-        });
+        let response;
+        let resJson;
+        let retries = 3;
+
+        while (retries > 0) {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: sysPrompt }] }],
+              generationConfig: { responseMimeType: "application/json" }
+            })
+          });
+
+          if (response.status === 503 || response.status === 429) {
+            console.warn(`[Telegram-Webhook] Gemini saturado (${response.status}). Reintentando en 2.5s...`);
+            await new Promise(resolve => setTimeout(resolve, 2500));
+            retries--;
+          } else {
+            break;
+          }
+        }
 
         if (response.ok) {
-          const resJson = await response.json();
+          resJson = await response.json();
           let cleanStr = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
           if (cleanStr.startsWith("```")) {
             cleanStr = cleanStr.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
