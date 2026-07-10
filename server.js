@@ -1001,11 +1001,28 @@ No devuelvas nada más que el JSON limpio.
 
         if (response.ok) {
           resJson = await response.json();
-          let cleanStr = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (cleanStr.startsWith("```")) {
-            cleanStr = cleanStr.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+          let rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          let cleanStr = rawText.trim();
+          
+          // Limpieza extrema de markdown
+          cleanStr = cleanStr.replace(/^```json/i, "").replace(/^```/, "").replace(/```$/,"").trim();
+          
+          let parsed;
+          try {
+            parsed = JSON.parse(cleanStr);
+          } catch (parseErr) {
+            console.error("[Telegram-Webhook] Error parseando JSON de Gemini.");
+            console.error("String crudo:", rawText);
+            console.error("String limpio:", cleanStr);
+            // Intento de fallback básico si falló por comillas internas
+            try {
+               // Si es un error tonto, a veces un eval con Function funciona mejor que JSON.parse estricto
+               parsed = (new Function("return " + cleanStr))();
+            } catch (fallbackErr) {
+               await sendTelegramMessage(chatId, "⚠️ Hubo un problema al entender la respuesta (Error de formato). Intenta responder de forma más sencilla.");
+               return res.sendStatus(200);
+            }
           }
-          const parsed = JSON.parse(cleanStr);
 
           pendingTx.id = Math.max(...(state.transacciones || []).map(t => t.id || 0), 0) + 1;
           pendingTx.categoria = parsed.categoria || "Otros";
@@ -1023,7 +1040,9 @@ No devuelvas nada más que el JSON limpio.
 
           await sendTelegramMessage(chatId, `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto.toFixed(2)}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_`);
         } else {
-          await sendTelegramMessage(chatId, "⚠️ Hubo un problema al procesar la categoría con Gemini. Intenta responder de nuevo.");
+          const errText = await response.text();
+          console.error("[Telegram-Webhook] Gemini API devolvió error:", response.status, errText);
+          await sendTelegramMessage(chatId, "⚠️ Hubo un problema al conectar con Gemini. Intenta responder de nuevo.");
         }
       } catch (err) {
         console.error("[Telegram-Webhook] Error en IA:", err);
