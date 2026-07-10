@@ -919,9 +919,13 @@ app.post('/api/telegram-webhook', async (req, res) => {
       normalizedText === 'ignorar' || 
       normalizedText === 'olvidalo' || 
       normalizedText === 'cancela' ||
+      normalizedText === 'prueba' ||
       normalizedText.includes('fue un error') ||
-      normalizedText.includes('olvidalo') ||
-      normalizedText.includes('no registrar');
+      normalizedText.includes('olvida') ||
+      normalizedText.includes('no registr') ||
+      normalizedText.includes('descar') ||
+      normalizedText.includes('prueba') ||
+      normalizedText.includes('test');
 
     if (isCancelWord) {
       if (state.transacciones_pendientes.length > 0) {
