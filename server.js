@@ -830,31 +830,44 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
 
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: extractionPrompt },
-              {
-                inlineData: {
-                  mimeType: cleanMimeType,
-                  data: cleanBase64
+    let response;
+    let retries = 3;
+
+    while (retries > 0) {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: extractionPrompt },
+                {
+                  inlineData: {
+                    mimeType: cleanMimeType,
+                    data: cleanBase64
+                  }
                 }
-              }
-            ]
+              ]
+            }
+          ],
+          generationConfig: {
+            responseMimeType: "application/json"
           }
-        ],
-        generationConfig: {
-          responseMimeType: "application/json"
-        }
-      })
-    });
+        })
+      });
+
+      if (response.status === 503 || response.status === 429) {
+        console.warn(`[IA-Image] Gemini saturado (${response.status}). Reintentando en 2.5s...`);
+        await new Promise(resolve => setTimeout(resolve, 2500));
+        retries--;
+      } else {
+        break;
+      }
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
