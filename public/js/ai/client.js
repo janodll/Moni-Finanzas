@@ -1353,8 +1353,12 @@ export function executeParsedAction(actionType, data, successMessage) {
       return;
     }
 
-    rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
-    rem.estado = "Pendiente";
+    if (rem.tipo !== "Tarjeta") {
+      rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
+      rem.estado = "Pendiente";
+    } else {
+      rem.estado = "Pagado";
+    }
 
     const tx = {
       id: generateUniqueId(),

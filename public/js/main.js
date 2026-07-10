@@ -900,8 +900,12 @@ export function setupFormSubmits() {
         state.transacciones.unshift(txServicio);
       }
 
-      rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
-      rem.estado = "Pendiente";
+      if (rem.tipo !== "Tarjeta") {
+        rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
+        rem.estado = "Pendiente";
+      } else {
+        rem.estado = "Pagado";
+      }
 
       document.getElementById("modal-pagar-recordatorio").classList.remove("active");
       saveState();
