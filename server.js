@@ -911,7 +911,19 @@ app.post('/api/telegram-webhook', async (req, res) => {
 
     state.transacciones_pendientes = state.transacciones_pendientes || [];
 
-    if (text.toLowerCase() === 'cancelar' || text.toLowerCase() === 'descartar') {
+    const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isCancelWord = 
+      normalizedText === 'cancelar' || 
+      normalizedText === 'descartar' || 
+      normalizedText === 'error' || 
+      normalizedText === 'ignorar' || 
+      normalizedText === 'olvidalo' || 
+      normalizedText === 'cancela' ||
+      normalizedText.includes('fue un error') ||
+      normalizedText.includes('olvidalo') ||
+      normalizedText.includes('no registrar');
+
+    if (isCancelWord) {
       if (state.transacciones_pendientes.length > 0) {
         const discarded = state.transacciones_pendientes.pop();
         state.updated_at = new Date().toISOString();
