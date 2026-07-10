@@ -831,7 +831,7 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
     let response;
-    let retries = 3;
+    let retries = 10;
 
     while (retries > 0) {
       response = await fetch(url, {
@@ -861,8 +861,8 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
       });
 
       if (response.status === 503 || response.status === 429) {
-        console.warn(`[IA-Image] Gemini saturado (${response.status}). Reintentando en 2.5s...`);
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        console.warn(`[IA-Image] Gemini saturado (${response.status}). Reintentando en 3s... (Quedan ${retries - 1} intentos)`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
         retries--;
       } else {
         break;
@@ -988,7 +988,7 @@ No devuelvas nada más que el JSON limpio.
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
         let response;
         let resJson;
-        let retries = 3;
+        let retries = 10;
 
         while (retries > 0) {
           response = await fetch(url, {
@@ -1004,8 +1004,8 @@ No devuelvas nada más que el JSON limpio.
           });
 
           if (response.status === 503 || response.status === 429) {
-            console.warn(`[Telegram-Webhook] Gemini saturado (${response.status}). Reintentando en 2.5s...`);
-            await new Promise(resolve => setTimeout(resolve, 2500));
+            console.warn(`[Telegram-Webhook] Gemini saturado (${response.status}). Reintentando en 3s... (Quedan ${retries - 1} intentos)`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             retries--;
           } else {
             break;
