@@ -506,7 +506,7 @@ async function handleTelegramDirectCommand(text, state, chatId) {
   const systemPrompt = getSystemPrompt(state);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -829,7 +829,7 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
 `;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -972,7 +972,7 @@ No devuelvas nada más que el JSON limpio.
 `;
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
         const response = await fetch(url, {
           method: 'POST',
           headers: {
@@ -1072,7 +1072,7 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
   // Detectar automáticamente si es Gemini (empieza por AIza, AQ. o no es sk-) o Kimi/OpenAI (suele empezar por sk-)
   const isGemini = apiKey.startsWith("AIza") || apiKey.startsWith("AQ.") || !apiKey.startsWith("sk-");
 
-  console.log(`[IA] Solicitud recibida: "${command}" | Proveedor detectado: ${isGemini ? 'Gemini (gemini-2.5-flash)' : 'Kimi (moonshot-v1-8k)'}`);
+  console.log(`[IA] Solicitud recibida: "${command}" | Proveedor detectado: ${isGemini ? 'Gemini (gemini-3.5-flash)' : 'Kimi (moonshot-v1-8k)'}`);
 
   const userName = state?.configuracion?.nombre_usuario || "Jano";
 
@@ -1094,7 +1094,7 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
       ];
 
       // Llamar a Gemini API con Instrucciones de Sistema y Conversación Multi-turno
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
       response = await fetch(url, {
         method: 'POST',
         headers: {
