@@ -69,6 +69,12 @@ if (process.env.RENDER === 'true' && !process.env.LOCAL_API_TOKEN) {
   console.error("FATAL: En producción (Render) debes definir LOCAL_API_TOKEN obligatoriamente.");
   process.exit(1);
 }
+// El webhook de Telegram es un endpoint público: en producción exige el secreto
+// para poder validar el header x-telegram-bot-api-secret-token (fail-closed).
+if (process.env.RENDER === 'true' && process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_WEBHOOK_SECRET) {
+  console.error("FATAL: En producción, si TELEGRAM_BOT_TOKEN está definido, TELEGRAM_WEBHOOK_SECRET es obligatorio.");
+  process.exit(1);
+}
 const LOCAL_TOKEN = process.env.LOCAL_API_TOKEN || crypto.randomUUID();
 
 function requireLocalAuth(req, res, next) {
@@ -906,9 +912,14 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
 
 // Endpoint del Webhook de Telegram
 app.post('/api/telegram-webhook', async (req, res) => {
-  if (process.env.TELEGRAM_WEBHOOK_SECRET && req.headers['x-telegram-bot-api-secret-token'] !== process.env.TELEGRAM_WEBHOOK_SECRET) {
-    console.warn("[Telegram] Intento de acceso sin secret_token válido.");
-    return res.sendStatus(403);
+  // Fail-closed: si hay un bot configurado, el secreto es obligatorio y se valida
+  // SIEMPRE. Sin secreto definido, se rechaza todo (evita dejar el webhook abierto).
+  if (process.env.TELEGRAM_BOT_TOKEN) {
+    if (!process.env.TELEGRAM_WEBHOOK_SECRET ||
+        req.headers['x-telegram-bot-api-secret-token'] !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+      console.warn("[Telegram] Intento de acceso sin secret_token válido.");
+      return res.sendStatus(403);
+    }
   }
 
   const update = req.body;
@@ -1286,7 +1297,13 @@ app.listen(PORT, HOST, () => {
   if (process.env.TELEGRAM_BOT_TOKEN && process.env.RENDER_EXTERNAL_URL) {
     const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/api/telegram-webhook`;
     console.log(`[Telegram] Intentando registrar Webhook automático en: ${webhookUrl}`);
-    fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${webhookUrl}`)
+    // Registrar el secret_token para que Telegram lo envíe en cada update via el
+    // header x-telegram-bot-api-secret-token (debe coincidir con el chequeo del handler).
+    let setWebhookUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/setWebhook?url=${encodeURIComponent(webhookUrl)}`;
+    if (process.env.TELEGRAM_WEBHOOK_SECRET) {
+      setWebhookUrl += `&secret_token=${encodeURIComponent(process.env.TELEGRAM_WEBHOOK_SECRET)}`;
+    }
+    fetch(setWebhookUrl)
       .then(r => r.json())
       .then(res => {
         if (res.ok) {

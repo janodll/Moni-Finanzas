@@ -25,10 +25,16 @@ function procesarCorreosMoniAndrea() {
         const cuerpo = mensaje.getPlainBody();
         
         Logger.log("Procesando: " + asunto);
-        extraerDatosConGemini(asunto, cuerpo);
-        
-        // Marca como leído para no procesarlo dos veces
-        mensaje.markRead();
+        const enviadoOk = extraerDatosConGemini(asunto, cuerpo);
+
+        // Marca como leído SOLO si el backend confirmó recepción (200) o si la IA
+        // decidió ignorarlo. Si Render está dormido/falla, el correo queda no leído
+        // para reintentarlo en el próximo ciclo del trigger sin perder el gasto.
+        if (enviadoOk) {
+          mensaje.markRead();
+        } else {
+          Logger.log("No se marcó como leído: el backend no confirmó el registro. Se reintentará.");
+        }
       }
     }
   }
@@ -99,17 +105,19 @@ No devuelvas nada más que el JSON limpio, sin bloques de código markdown.
       // --- CAMBIO NUEVO: Barrera para desechar la publicidad ---
       if (dataExtrida.tipo === "IGNORAR") {
         Logger.log("Correo publicitario o irrelevante ignorado por la IA.");
-        return;
+        return true; // Se procesó correctamente (no es un gasto): se puede marcar leído.
       }
       // ----------------------------------------------------------
-      
+
       Logger.log("IA extrajo (Andrea): " + JSON.stringify(dataExtrida));
-      enviarAMoniBackend(dataExtrida);
+      return enviarAMoniBackend(dataExtrida);
     } catch (e) {
       Logger.log("Error parseando el JSON de Gemini: " + e.message);
+      return false;
     }
   } else {
     Logger.log("Error de Gemini API: " + response.getContentText());
+    return false;
   }
 }
 
