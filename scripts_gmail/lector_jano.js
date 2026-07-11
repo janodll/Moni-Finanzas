@@ -2,9 +2,10 @@
 // MONI FINANZAS - LECTOR DE CORREOS (VERSIÓN JANO)
 // =======================================================
 
-const GEMINI_API_KEY = "YOUR_GEMINI_API_KEY_HERE";
-const MONI_API_URL = "YOUR_RENDER_URL_HERE";
-const MONI_API_TOKEN = "YOUR_MONI_API_TOKEN_HERE";
+const props = PropertiesService.getScriptProperties();
+const GEMINI_API_KEY = props.getProperty('GEMINI_API_KEY');
+const MONI_API_URL = props.getProperty('MONI_API_URL');
+const MONI_API_TOKEN = props.getProperty('MONI_API_TOKEN');
 
 function procesarCorreosMoni() {
   // Busca correos no leídos de los bancos
@@ -125,4 +126,5 @@ function enviarAMoniBackend(data) {
 
   const response = UrlFetchApp.fetch(MONI_API_URL, options);
   Logger.log("Respuesta de tu servidor (Render): " + response.getContentText());
+  return response.getResponseCode() === 200;
 }

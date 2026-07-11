@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { Mutex } from 'async-mutex';
+
+const stateMutex = new Mutex();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,6 +65,10 @@ app.use('/reportes', express.static(path.join(__dirname, 'reportes'), staticOpts
 // El frontend lo obtiene automáticamente vía /api/session-token (solo localhost),
 // por lo que en uso local el cambio es transparente. Para despliegues remotos
 // (Railway, etc.) definir LOCAL_API_TOKEN como variable de entorno fija.
+if (process.env.RENDER === 'true' && !process.env.LOCAL_API_TOKEN) {
+  console.error("FATAL: En producción (Render) debes definir LOCAL_API_TOKEN obligatoriamente.");
+  process.exit(1);
+}
 const LOCAL_TOKEN = process.env.LOCAL_API_TOKEN || crypto.randomUUID();
 
 function requireLocalAuth(req, res, next) {
@@ -792,11 +799,14 @@ app.get('/api/data', requireLocalAuth, async (req, res) => {
 
 // Endpoint para registro automático (desde correos)
 app.post('/api/auto-register', requireLocalAuth, async (req, res) => {
+  return await stateMutex.runExclusive(async () => {
   await handleAutoRegister(req, res);
+  });
 });
 
 // Endpoint para procesar capturas de pantalla de gastos (desde Atajo iOS)
 app.post('/api/auto-register-image', requireLocalAuth, async (req, res) => {
+  return await stateMutex.runExclusive(async () => {
   const { imageBase64, mimeType } = req.body;
   
   if (!imageBase64) {
@@ -891,10 +901,16 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
     console.error("[IA-Image] Error al procesar imagen con la IA:", err);
     res.status(500).json({ error: "Ocurrió un error en el servidor al procesar la imagen: " + err.message });
   }
+  });
 });
 
 // Endpoint del Webhook de Telegram
 app.post('/api/telegram-webhook', async (req, res) => {
+  if (process.env.TELEGRAM_WEBHOOK_SECRET && req.headers['x-telegram-bot-api-secret-token'] !== process.env.TELEGRAM_WEBHOOK_SECRET) {
+    console.warn("[Telegram] Intento de acceso sin secret_token válido.");
+    return res.sendStatus(403);
+  }
+
   const update = req.body;
   if (!update || !update.message) {
     return res.sendStatus(200);
@@ -909,6 +925,7 @@ app.post('/api/telegram-webhook', async (req, res) => {
     return res.sendStatus(200);
   }
 
+  return await stateMutex.runExclusive(async () => {
   try {
     const state = await getLatestState();
     if (!state) {
@@ -1021,13 +1038,8 @@ No devuelvas nada más que el JSON limpio.
             console.error("String crudo:", rawText);
             console.error("String limpio:", cleanStr);
             // Intento de fallback básico si falló por comillas internas
-            try {
-               // Si es un error tonto, a veces un eval con Function funciona mejor que JSON.parse estricto
-               parsed = (new Function("return " + cleanStr))();
-            } catch (fallbackErr) {
-               await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${cleanStr.substring(0, 150)}\nError: ${fallbackErr.message}`);
-               return res.sendStatus(200);
-            }
+            await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${cleanStr.substring(0, 150)}`);
+            return res.sendStatus(200);
           }
 
           pendingTx.id = Math.max(...(state.transacciones || []).map(t => t.id || 0), 0) + 1;
@@ -1098,10 +1110,12 @@ No devuelvas nada más que el JSON limpio.
   }
 
   return res.sendStatus(200);
+  });
 });
 
 // Guardar datos
 app.post('/api/data', requireLocalAuth, async (req, res) => {
+  return await stateMutex.runExclusive(async () => {
   const newData = req.body;
 
   if (!newData || typeof newData !== 'object') {
@@ -1127,14 +1141,13 @@ app.post('/api/data', requireLocalAuth, async (req, res) => {
   } else {
     res.status(500).json({ error: "No se pudo guardar la información local." });
   }
+  });
 });
 
 // Endpoint de NLP Híbrido (Gemini o Kimi/Moonshot)
 app.post('/api/command', requireLocalAuth, async (req, res) => {
   const { command, state, history } = req.body;
-  const authHeader = req.headers.authorization;
-  // Extraer de forma robusta la API Key limpiando espacios adicionales y el prefijo Bearer
-  const apiKey = authHeader ? authHeader.replace(/^Bearer\s+/i, '').trim() : null;
+  const apiKey = process.env.GEMINI_API_KEY;
 
   if (!command) {
     return res.status(400).json({ error: "Falta el comando de texto." });
@@ -1247,7 +1260,11 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
 });
 
 // Ruta comodín para SPA
-app.get('*', (req, res) => {
+// Ruta comodín restringida a rutas no-API para que devuelva el SPA
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next(); // Pasa al manejador de 404 (si lo hay) o devuelve error estándar de Express
+  }
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
