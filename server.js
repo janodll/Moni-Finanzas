@@ -1032,7 +1032,7 @@ No devuelvas nada más que el JSON limpio.
                // Si es un error tonto, a veces un eval con Function funciona mejor que JSON.parse estricto
                parsed = (new Function("return " + cleanStr))();
             } catch (fallbackErr) {
-               await sendTelegramMessage(chatId, "⚠️ Hubo un problema al entender la respuesta (Error de formato). Intenta responder de forma más sencilla.");
+               await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${cleanStr.substring(0, 150)}\nError: ${fallbackErr.message}`);
                return res.sendStatus(200);
             }
           }
