@@ -1044,6 +1044,41 @@ No devuelvas nada más que el JSON limpio.
           state.transacciones_pendientes.pop();
           state.transacciones = state.transacciones || [];
           state.transacciones.unshift(pendingTx);
+
+          // Lógica de transferencia automática entre cuentas internas
+          const normalizeString = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          const catNorm = normalizeString(pendingTx.categoria);
+          const descNorm = normalizeString(pendingTx.descripcion);
+          
+          if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id) {
+            const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
+            const targetName = descNorm.includes("andrea") ? "Andrea" : (descNorm.includes("jano") ? "Jano" : null);
+            
+            if (sourceAccount && targetName) {
+              // Buscar la cuenta destino que pertenezca a la otra persona y sea del mismo banco
+              const targetAccount = (state.cuentas || []).find(c => 
+                normalizeString(c.nombre).includes(normalizeString(targetName)) && 
+                c.banco === sourceAccount.banco
+              );
+              
+              if (targetAccount) {
+                const txEspejo = {
+                  id: pendingTx.id + 1,
+                  fecha: pendingTx.fecha,
+                  tipo: "INGRESO",
+                  categoria: "Transferencia",
+                  descripcion: `Transferencia automática de ${targetName === "Andrea" ? "Jano" : "Andrea"}`,
+                  monto: pendingTx.monto,
+                  moneda: pendingTx.moneda,
+                  cuenta_id: targetAccount.id,
+                  tarjeta_id: null,
+                  fijo: "Variable"
+                };
+                state.transacciones.unshift(txEspejo);
+                console.log(`[Transferencia Automática] Creado ingreso espejo de ${pendingTx.monto} en cuenta destino: ${targetAccount.nombre}`);
+              }
+            }
+          }
           state.updated_at = new Date().toISOString();
 
           if (SUPABASE_URL && SUPABASE_KEY) {
