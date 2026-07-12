@@ -45,7 +45,7 @@ function extraerDatosConGemini(asunto, cuerpo) {
 Eres el asistente financiero de Andrea. Analiza este correo bancario.
 
 REGLA VITAL ANTI-SPAM: Los bancos suelen enviar publicidad. Debes IGNORAR el correo (respondiendo ÚNICAMENTE con el JSON: {"tipo": "IGNORAR"}) si notas que es una promoción, oferta, alerta de inicio de sesión, o usa frases como "gana", "inscríbete", "descubre", "campaña".
-Los comprobantes REALES confirman una acción ejecutada ("realizaste un consumo", "transferencia", "yapearon", "constancia", "comprobante") y traen fecha o número de operación. Si cumple con esto, extrae la información.
+Los comprobantes REALES confirman una acción ejecutada ("realizaste un consumo", "transferencia", "yapearon", "constancia", "comprobante", "pago recurrente") y traen fecha y monto (el número de operación a veces no viene en pagos recurrentes o suscripciones, si falta el nro de operación pero es un pago real, acéptalo igual). Si cumple con esto, extrae la información.
 
 Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con este formato:
 {
