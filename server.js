@@ -1047,15 +1047,35 @@ app.post('/api/telegram-webhook', async (req, res) => {
     // Caso A: Hay transacciones pendientes. El texto ingresado categoriza un gasto.
     if (state.transacciones_pendientes.length > 0) {
       let pendingTxIndex = state.transacciones_pendientes.length - 1;
-      
-      // Intentar buscar coincidencia si el mensaje es una respuesta (Reply) a un aviso del bot
-      if (message.reply_to_message && message.reply_to_message.message_id) {
+      let matchedByReply = false;
+
+      // Emparejar el pendiente correcto cuando el mensaje es un Reply a un aviso del bot.
+      if (message.reply_to_message) {
         const replyMsgId = message.reply_to_message.message_id;
-        const matchedIndex = state.transacciones_pendientes.findIndex(t => t.telegram_message_id === replyMsgId);
+        // 1) Match exacto por message_id (pendientes creados con el sistema nuevo).
+        let matchedIndex = state.transacciones_pendientes.findIndex(t => t.telegram_message_id === replyMsgId);
+
+        // 2) Fallback por el monto citado en el texto del aviso (pendientes viejos sin message_id).
+        if (matchedIndex === -1 && message.reply_to_message.text) {
+          const m = message.reply_to_message.text.match(/Monto:[^\d]*(\d+(?:[.,]\d+)?)/i);
+          if (m) {
+            const montoCitado = parseFloat(m[1].replace(',', '.'));
+            matchedIndex = state.transacciones_pendientes.findIndex(t => Number(t.monto) === montoCitado);
+          }
+        }
+
         if (matchedIndex !== -1) {
           pendingTxIndex = matchedIndex;
-          console.log(`[Telegram-Webhook] Coincidencia por Reply-To Message ID: ${replyMsgId}`);
+          matchedByReply = true;
+          console.log(`[Telegram-Webhook] Pendiente emparejado por reply (idx ${matchedIndex}).`);
         }
+      }
+
+      // Fail-safe: con varios pendientes y sin poder emparejar el Reply, NO asignar a ciegas al
+      // último (eso categoriza el gasto equivocado). Pedir un reply explícito al gasto correcto.
+      if (!matchedByReply && state.transacciones_pendientes.length > 1) {
+        await sendTelegramMessage(chatId, `⚠️ Tienes ${state.transacciones_pendientes.length} gastos pendientes. Para registrar el correcto, *responde (Reply)* al mensaje de ese gasto y escribe la categoría.`);
+        return res.sendStatus(200);
       }
 
       const pendingTx = state.transacciones_pendientes[pendingTxIndex];
