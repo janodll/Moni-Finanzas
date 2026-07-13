@@ -550,6 +550,41 @@ function executeActionOnState(actionType, data, state) {
 }
 
 // Procesa una instrucción de voz/texto libre desde Telegram usando Gemini
+// Llama a generateContent probando varios modelos ante 503/429 (modelo saturado del
+// lado de Google). Reintentar el mismo modelo saturado no sirve; se cae a uno alterno.
+// Pocos reintentos por modelo para no bloquear demasiado (Telegram reentrega el update
+// si tardas). Devuelve el Response del primer modelo que responde (ok o error que no es
+// saturación), o el último Response si todos siguen saturados.
+async function geminiGenerateContent(apiKey, body, label = 'Gemini') {
+  const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash'];
+  const payload = typeof body === 'string' ? body : JSON.stringify(body);
+  let response;
+  for (const modelName of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+    let retries = 2;
+    let overloaded = false;
+    while (retries > 0) {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: payload
+      });
+      if (response.status === 503 || response.status === 429) {
+        overloaded = true;
+        console.warn(`[${label}] ${modelName} saturado (${response.status}). Quedan ${retries - 1} reintentos.`);
+        await new Promise(r => setTimeout(r, 2000));
+        retries--;
+      } else {
+        overloaded = false;
+        break;
+      }
+    }
+    if (!overloaded) break;
+    console.warn(`[${label}] ${modelName} sigue saturado; probando modelo alternativo...`);
+  }
+  return response;
+}
+
 async function handleTelegramDirectCommand(text, state, chatId) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -560,25 +595,17 @@ async function handleTelegramDirectCommand(text, state, chatId) {
   const systemPrompt = getSystemPrompt(state);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey
+    const response = await geminiGenerateContent(apiKey, {
+      systemInstruction: {
+        parts: [{ text: systemPrompt }]
       },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: `INSTRUCCIÓN DE ${userName.toUpperCase()}: "${text}"` }]
-          }
-        ]
-      })
-    });
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: `INSTRUCCIÓN DE ${userName.toUpperCase()}: "${text}"` }]
+        }
+      ]
+    }, 'Telegram-Cmd');
 
     if (!response.ok) {
       await sendTelegramMessage(chatId, "⚠️ Hubo un problema al conectar con Gemini.");
@@ -909,42 +936,21 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
 `;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
-    let response;
-    let retries = 10;
-
-    while (retries > 0) {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [
+    const response = await geminiGenerateContent(apiKey, {
+      contents: [
+        {
+          parts: [
+            { text: extractionPrompt },
             {
-              parts: [
-                { text: extractionPrompt },
-                {
-                  inlineData: {
-                    mimeType: cleanMimeType,
-                    data: cleanBase64
-                  }
-                }
-              ]
+              inlineData: {
+                mimeType: cleanMimeType,
+                data: cleanBase64
+              }
             }
           ]
-        })
-      });
-
-      if (response.status === 503 || response.status === 429) {
-        console.warn(`[IA-Image] Gemini saturado (${response.status}). Reintentando en 3s... (Quedan ${retries - 1} intentos)`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        retries--;
-      } else {
-        break;
-      }
-    }
+        }
+      ]
+    }, 'IA-Image');
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -1116,43 +1122,10 @@ No devuelvas nada más que el JSON limpio.
 `;
 
       try {
-        // Ante un 503 (modelo saturado) no sirve martillar el mismo modelo: se cae a
-        // un modelo alternativo. Pocos reintentos por modelo para no bloquear el webhook
-        // >30s, porque Telegram reentrega el update y dispara doble procesamiento.
-        const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash'];
-        let response;
         let resJson;
-
-        for (const modelName of modelsToTry) {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-          let retries = 2;
-          let overloaded = false;
-          while (retries > 0) {
-            response = await fetch(url, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKey
-              },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: sysPrompt }] }]
-              })
-            });
-
-            if (response.status === 503 || response.status === 429) {
-              overloaded = true;
-              console.warn(`[Telegram-Webhook] ${modelName} saturado (${response.status}). Quedan ${retries - 1} reintentos en este modelo.`);
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              retries--;
-            } else {
-              overloaded = false;
-              break;
-            }
-          }
-          // Si respondió (ok, o error que no es saturación) no probamos el siguiente modelo.
-          if (!overloaded) break;
-          console.warn(`[Telegram-Webhook] ${modelName} sigue saturado; probando modelo alternativo...`);
-        }
+        const response = await geminiGenerateContent(apiKey, {
+          contents: [{ parts: [{ text: sysPrompt }] }]
+        }, 'Telegram-Webhook');
 
         if (response.ok) {
           resJson = await response.json();
@@ -1351,20 +1324,13 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
       ];
 
       // Llamar a Gemini API con Instrucciones de Sistema y Conversación Multi-turno
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
+      // (con fallback multi-modelo ante saturación).
+      response = await geminiGenerateContent(apiKey, {
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
         },
-        body: JSON.stringify({
-          systemInstruction: {
-            parts: [{ text: systemPrompt }]
-          },
-          contents: contents
-        })
-      });
+        contents: contents
+      }, 'IA-Command');
     } else {
       // Formatear el historial y el mensaje del usuario para Kimi (OpenAI compatible)
       const messages = [

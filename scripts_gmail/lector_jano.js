@@ -6,6 +6,8 @@ const props = PropertiesService.getScriptProperties();
 const GEMINI_API_KEY = props.getProperty('GEMINI_API_KEY');
 const MONI_API_URL = props.getProperty('MONI_API_URL');
 const MONI_API_TOKEN = props.getProperty('MONI_API_TOKEN');
+const TELEGRAM_BOT_TOKEN = props.getProperty('TELEGRAM_BOT_TOKEN');
+const TELEGRAM_CHAT_ID = props.getProperty('TELEGRAM_CHAT_ID');
 
 function procesarCorreosMoni() {
   // Busca correos no leídos de los bancos
@@ -53,7 +55,8 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
   "monto": <número decimal>,
   "moneda": "S/." o "US$",
   "banco_o_metodo": "<Nombre del banco> Jano",
-  "descripcion_original": "<A quién se pagó o detalle>"
+  "descripcion_original": "<A quién se pagó o detalle>",
+  "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>"
 }
 
 REGLA DE ORO PARA EL BANCO_O_METODO: Debes deducir el banco (BCP, Interbank, BBVA, Falabella, Yape, Plin) y SIEMPRE agregarle la palabra "Jano" al final (Por ejemplo: "BCP Jano", "Interbank Jano", "CMR Falabella"). Esto es crítico para diferenciar sus cuentas de las de su esposa.
@@ -64,7 +67,7 @@ CUERPO: ${cuerpo}
 No devuelvas nada más que el JSON limpio, sin bloques de código markdown.
 `;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
   
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
@@ -94,25 +97,40 @@ No devuelvas nada más que el JSON limpio, sin bloques de código markdown.
 
   if (response.getResponseCode() === 200) {
     const resJson = JSON.parse(response.getContentText());
-    let cleanStr = resJson.candidates[0].content.parts[0].text.trim();
-    if (cleanStr.startsWith("\`\`\`")) {
-      cleanStr = cleanStr.replace(/^\`\`\`json\s*/i, "").replace(/\`\`\`$/, "").trim();
+    let cleanStr = resJson.candidates[0].content.parts[0].text;
+    
+    // --- EXTRACCIÓN ROBUSTA ---
+    let startIndex = cleanStr.indexOf('{');
+    if (startIndex !== -1) {
+      cleanStr = cleanStr.substring(startIndex);
     }
     
-    try {
-      const dataExtrida = JSON.parse(cleanStr);
-      
-      // --- CAMBIO NUEVO: Barrera para desechar la publicidad ---
-      if (dataExtrida.tipo === "IGNORAR") {
-        Logger.log("Correo publicitario o irrelevante ignorado por la IA.");
-        return true; // Se procesó correctamente (no es un gasto): se puede marcar leído.
+    let parsedData = null;
+    let originalStr = cleanStr;
+    
+    while (cleanStr.length > 0) {
+      try {
+        parsedData = JSON.parse(cleanStr);
+        break; // Éxito
+      } catch (e) {
+        // Si falla, quitamos el último caracter (basura, llave extra) y reintentamos
+        cleanStr = cleanStr.substring(0, cleanStr.length - 1);
       }
-      // ----------------------------------------------------------
-
-      Logger.log("IA extrajo (Jano): " + JSON.stringify(dataExtrida));
-      return enviarAMoniBackend(dataExtrida);
-    } catch (e) {
-      Logger.log("Error parseando el JSON de Gemini: " + e.message);
+    }
+    
+    Logger.log("TEXTO CRUDO DE GEMINI: " + originalStr);
+    
+    if (parsedData) {
+      if (parsedData.tipo === "IGNORAR") {
+        Logger.log("Correo publicitario o irrelevante ignorado por la IA.");
+        return true; 
+      }
+      
+      Logger.log("IA extrajo (Jano): " + JSON.stringify(parsedData));
+      return enviarAMoniBackend(parsedData);
+    } else {
+      Logger.log("Fallo total al parsear JSON.");
+      enviarAlertaTelegram(`Fallo parseo JSON Gemini.\nAsunto: ${asunto}\nError: No se pudo encontrar un JSON válido.\nRespuesta cruda: ${originalStr.substring(0, 100)}`);
       return false;
     }
   } else {
@@ -135,4 +153,20 @@ function enviarAMoniBackend(data) {
   const response = UrlFetchApp.fetch(MONI_API_URL, options);
   Logger.log("Respuesta de tu servidor (Render): " + response.getContentText());
   return response.getResponseCode() === 200;
+}
+
+function enviarAlertaTelegram(mensaje) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({
+      chat_id: TELEGRAM_CHAT_ID,
+      text: `🚨 *ALERTA Apps Script (Jano)* 🚨\n${mensaje}`,
+      parse_mode: 'Markdown'
+    }),
+    muteHttpExceptions: true
+  };
+  UrlFetchApp.fetch(url, options);
 }
