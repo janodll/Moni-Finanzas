@@ -560,7 +560,7 @@ async function handleTelegramDirectCommand(text, state, chatId) {
   const systemPrompt = getSystemPrompt(state);
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -777,19 +777,24 @@ async function handleAutoRegister(req, res) {
     }
   }
 
-  // Comprobar desduplicación por similitud (para evitar duplicados cuando Apps Script da timeout y reintenta)
+  // Comprobar desduplicación por similitud (evita duplicados cuando el mismo pago
+  // llega por varios correos o cuando Apps Script reintenta tras un timeout).
+  // Revisa PENDIENTES y transacciones YA REGISTRADAS dentro de una ventana de 5 min,
+  // comparando monto + banco/método + descripción de origen.
   const cincoMinutosAtras = new Date(Date.now() - 5 * 60000);
-  const isPendingSimilar = (state.transacciones_pendientes || []).some(t => {
+  const matchesSimilar = (t) => {
     if (!t.created_at) return false;
-    const isRecent = new Date(t.created_at) > cincoMinutosAtras;
-    return isRecent && 
-           t.monto === parseFloat(monto) && 
-           t.banco_o_metodo === banco_o_metodo && 
+    if (new Date(t.created_at) <= cincoMinutosAtras) return false;
+    return t.monto === parseFloat(monto) &&
+           t.banco_o_metodo === banco_o_metodo &&
            t.descripcion_original === descripcion_original;
-  });
+  };
+  const isSimilarDuplicate =
+    (state.transacciones_pendientes || []).some(matchesSimilar) ||
+    (state.transacciones || []).some(matchesSimilar);
 
-  if (isPendingSimilar) {
-    console.log(`[Auto-Register] Transacción duplicada por similitud en los últimos 5 min ignorada.`);
+  if (isSimilarDuplicate) {
+    console.log(`[Auto-Register] Transacción duplicada por similitud (5 min) ignorada.`);
     return res.json({ ok: true, message: "Transacción duplicada por similitud ignorada.", duplicate: true });
   }
 
@@ -807,6 +812,7 @@ async function handleAutoRegister(req, res) {
     tarjeta_id,
     fijo: "Variable",
     nro_operacion: nro_operacion || null,
+    banco_o_metodo: banco_o_metodo,
     descripcion_original: descripcion_original || banco_o_metodo,
     created_at: new Date().toISOString()
   };
@@ -903,7 +909,7 @@ Responde únicamente con el JSON puro, sin bloques markdown de tipo \`\`\`json.
 `;
 
   try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
     let response;
     let retries = 10;
 
@@ -1090,7 +1096,7 @@ No devuelvas nada más que el JSON limpio.
 `;
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
         let response;
         let resJson;
         let retries = 10;
@@ -1291,7 +1297,7 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
   // Detectar automáticamente si es Gemini (empieza por AIza, AQ. o no es sk-) o Kimi/OpenAI (suele empezar por sk-)
   const isGemini = apiKey.startsWith("AIza") || apiKey.startsWith("AQ.") || !apiKey.startsWith("sk-");
 
-  console.log(`[IA] Solicitud recibida: "${command}" | Proveedor detectado: ${isGemini ? 'Gemini (gemini-3.5-flash)' : 'Kimi (moonshot-v1-8k)'}`);
+  console.log(`[IA] Solicitud recibida: "${command}" | Proveedor detectado: ${isGemini ? 'Gemini (gemini-flash-latest)' : 'Kimi (moonshot-v1-8k)'}`);
 
   const userName = state?.configuracion?.nombre_usuario || "Jano";
 
@@ -1313,7 +1319,7 @@ app.post('/api/command', requireLocalAuth, async (req, res) => {
       ];
 
       // Llamar a Gemini API con Instrucciones de Sistema y Conversación Multi-turno
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
       response = await fetch(url, {
         method: 'POST',
         headers: {
