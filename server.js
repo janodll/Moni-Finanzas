@@ -242,12 +242,12 @@ async function getLatestState() {
   return localData;
 }
 
-// Envía un mensaje de Telegram en formato Markdown al chat del usuario
+// Envía un mensaje de Telegram en formato Markdown al chat del usuario y retorna el mensaje enviado (o null)
 async function sendTelegramMessage(chatId, text) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn("[Telegram] No se configuró TELEGRAM_BOT_TOKEN");
-    return false;
+    return null;
   }
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -259,10 +259,16 @@ async function sendTelegramMessage(chatId, text) {
         parse_mode: 'Markdown'
       })
     });
-    return res.ok;
+    if (!res.ok) {
+      const err = await res.text();
+      console.error("[Telegram] Error al enviar mensaje:", err);
+      return null;
+    }
+    const data = await res.json();
+    return data.result || null;
   } catch (err) {
     console.error("[Telegram] Error al enviar mensaje:", err);
-    return false;
+    return null;
   }
 }
 
@@ -822,7 +828,15 @@ async function handleAutoRegister(req, res) {
     
     return res.json({ ok: true, registered: true, data: newTx });
   } else {
-    // Guardar en pendientes y disparar mensaje a Telegram
+    // Enviar mensaje a Telegram primero para obtener su message_id
+    const chatMsg = `🔔 *Gasto Detectado* (${banco_o_metodo})\nMonto: *${newTx.moneda} ${newTx.monto.toFixed(2)}*\nDetalle: _${newTx.descripcion_original}_\n\n¿En qué gastaste? Responde con el detalle (ej: "almuerzo", "taxi", "frutas").`;
+    
+    const sentMsg = await sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, chatMsg);
+    if (sentMsg && sentMsg.message_id) {
+      newTx.telegram_message_id = sentMsg.message_id;
+    }
+
+    // Guardar en pendientes
     state.transacciones_pendientes = state.transacciones_pendientes || [];
     state.transacciones_pendientes.push(newTx);
     state.updated_at = new Date().toISOString();
@@ -831,10 +845,6 @@ async function handleAutoRegister(req, res) {
       await uploadToSupabase(state);
     }
     saveLocalDataSync(state);
-
-    const chatMsg = `🔔 *Gasto Detectado* (${banco_o_metodo})\nMonto: *${newTx.moneda} ${newTx.monto.toFixed(2)}*\nDetalle: _${newTx.descripcion_original}_\n\n¿En qué gastaste? Responde con el detalle (ej: "almuerzo", "taxi", "frutas").`;
-    
-    await sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, chatMsg);
 
     return res.json({ ok: true, registered: false, pending: true, data: newTx });
   }
@@ -1028,9 +1038,21 @@ app.post('/api/telegram-webhook', async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // Caso A: Hay transacciones pendientes. El texto ingresado categoriza el último gasto.
+    // Caso A: Hay transacciones pendientes. El texto ingresado categoriza un gasto.
     if (state.transacciones_pendientes.length > 0) {
-      const pendingTx = state.transacciones_pendientes[state.transacciones_pendientes.length - 1];
+      let pendingTxIndex = state.transacciones_pendientes.length - 1;
+      
+      // Intentar buscar coincidencia si el mensaje es una respuesta (Reply) a un aviso del bot
+      if (message.reply_to_message && message.reply_to_message.message_id) {
+        const replyMsgId = message.reply_to_message.message_id;
+        const matchedIndex = state.transacciones_pendientes.findIndex(t => t.telegram_message_id === replyMsgId);
+        if (matchedIndex !== -1) {
+          pendingTxIndex = matchedIndex;
+          console.log(`[Telegram-Webhook] Coincidencia por Reply-To Message ID: ${replyMsgId}`);
+        }
+      }
+
+      const pendingTx = state.transacciones_pendientes[pendingTxIndex];
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         await sendTelegramMessage(chatId, "⚠️ No se configuró GEMINI_API_KEY en el servidor para procesar la categorización.");
@@ -1099,19 +1121,27 @@ No devuelvas nada más que el JSON limpio.
           let rawText = resJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
           let cleanStr = rawText.trim();
           
-          // Limpieza extrema de markdown
-          cleanStr = cleanStr.replace(/^```json/i, "").replace(/^```/, "").replace(/```$/,"").trim();
+          // --- EXTRACCIÓN ROBUSTA ---
+          let startIndex = cleanStr.indexOf('{');
+          if (startIndex !== -1) {
+            cleanStr = cleanStr.substring(startIndex);
+          }
           
-          let parsed;
-          try {
-            parsed = JSON.parse(cleanStr);
-          } catch (parseErr) {
+          let parsed = null;
+          while (cleanStr.length > 0) {
+            try {
+              parsed = JSON.parse(cleanStr);
+              break;
+            } catch (e) {
+              cleanStr = cleanStr.substring(0, cleanStr.length - 1);
+            }
+          }
+          
+          if (!parsed) {
             console.error("[Telegram-Webhook] Error parseando JSON de Gemini.");
             console.error("String crudo:", rawText);
-            console.error("String limpio:", cleanStr);
-            notifyAdminError('[Telegram-Webhook JSON Parse]', `Error: ${parseErr.message}\nJSON: ${cleanStr.substring(0, 100)}`);
-            // Intento de fallback básico si falló por comillas internas
-            await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${cleanStr.substring(0, 150)}`);
+            notifyAdminError('[Telegram-Webhook JSON Parse]', `Error: No se pudo encontrar un JSON válido.\nJSON: ${rawText.substring(0, 100)}`);
+            await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${rawText.substring(0, 150)}`);
             return res.sendStatus(200);
           }
 
@@ -1119,7 +1149,8 @@ No devuelvas nada más que el JSON limpio.
           pendingTx.categoria = parsed.categoria || "Otros";
           pendingTx.descripcion = parsed.descripcion || text;
 
-          state.transacciones_pendientes.pop();
+          // Remover la transacción del índice correspondiente (evita pop() ciego)
+          state.transacciones_pendientes.splice(pendingTxIndex, 1);
           state.transacciones = state.transacciones || [];
           state.transacciones.unshift(pendingTx);
 
