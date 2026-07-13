@@ -432,12 +432,12 @@ export function filterCategorySelect(selectEl, transactionType) {
   Object.keys(CATEGORY_STYLES).forEach(cat => {
     const estilo = CATEGORY_STYLES[cat];
     let catTipo = estilo.tipo;
-    if (!catTipo) {
-      if (cat === "Sueldo") catTipo = "INGRESO";
-      else if (["Saldo Inicial", "Deuda Inicial", "Pago Tarjeta", "Transferencia"].includes(cat)) catTipo = "SISTEMA";
-      else if (cat === "Otros") catTipo = "AMBOS";
-      else catTipo = "GASTO";
-    }
+    
+    // Sobrescribir tipos fijos del sistema para evitar que datos antiguos guarden "SISTEMA" en Transferencia
+    if (cat === "Sueldo") catTipo = "INGRESO";
+    else if (["Saldo Inicial", "Deuda Inicial", "Pago Tarjeta"].includes(cat)) catTipo = "SISTEMA";
+    else if (["Otros", "Transferencia"].includes(cat)) catTipo = "AMBOS";
+    else if (!catTipo) catTipo = "GASTO";
 
     const match = 
       (transactionType === "GASTO" && (catTipo === "GASTO" || catTipo === "AMBOS")) ||

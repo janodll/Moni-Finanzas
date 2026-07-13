@@ -26,7 +26,7 @@ export const DEFAULT_CATEGORY_STYLES = {
   "Entretenimiento": { icon: "party-popper", color: "#8B5CF6", bg: "#F5F3FF", tipo: "GASTO" },
   "Sueldo": { icon: "banknote", color: "#10B981", bg: "#ECFDF5", tipo: "INGRESO" },
   "Pago Tarjeta": { icon: "credit-card", color: "#6366F1", bg: "#EEF2FF", tipo: "SISTEMA" },
-  "Transferencia": { icon: "repeat", color: "#6B7280", bg: "#F3F4F6", tipo: "SISTEMA" },
+  "Transferencia": { icon: "repeat", color: "#6B7280", bg: "#F3F4F6", tipo: "AMBOS" },
   "Ahorro": { icon: "piggy-bank", color: "#EC4899", bg: "#FCE7F3", tipo: "GASTO" },
   "Mascotas": { icon: "paw-print", color: "#EC4899", bg: "#FCE7F3", tipo: "GASTO" },
   "Saldo Inicial": { icon: "wallet", color: "#10B981", bg: "#ECFDF5", tipo: "SISTEMA" },
@@ -39,7 +39,8 @@ export let CATEGORY_STYLES = { ...DEFAULT_CATEGORY_STYLES };
 
 export function updateCategoryStyles(newStyles) {
   Object.keys(CATEGORY_STYLES).forEach(k => delete CATEGORY_STYLES[k]);
-  Object.assign(CATEGORY_STYLES, newStyles);
+  // Mezclar los defaults con los guardados, para que nunca falte una categoría base
+  Object.assign(CATEGORY_STYLES, DEFAULT_CATEGORY_STYLES, newStyles || {});
 }
 
 // Estado global mutable

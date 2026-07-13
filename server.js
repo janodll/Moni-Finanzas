@@ -35,6 +35,21 @@ if (fs.existsSync(envPath)) {
   }
 }
 
+// Captura de errores no controlados
+process.on('uncaughtException', async (err) => {
+  console.error("Excepción no controlada:", err);
+  if (typeof notifyAdminError === 'function') {
+    await notifyAdminError('Uncaught Exception', err.message || err);
+  }
+  process.exit(1);
+});
+process.on('unhandledRejection', async (reason) => {
+  console.error("Rechazo de promesa no controlado:", reason);
+  if (typeof notifyAdminError === 'function') {
+    await notifyAdminError('Unhandled Rejection', reason.message || reason);
+  }
+});
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_FILE = process.env.DATA_FILE_PATH || path.join(__dirname, 'datos.json');
@@ -157,11 +172,13 @@ async function uploadToSupabase(data) {
     if (!response.ok) {
       const errTxt = await response.text();
       console.error(`[Supabase] Error al subir datos (${response.status}):`, errTxt);
+      notifyAdminError('[Supabase Upload]', `HTTP ${response.status}: ${errTxt}`);
       return false;
     }
     return true;
   } catch (err) {
     console.error("[Supabase] Excepción al subir datos a la nube:", err);
+    notifyAdminError('[Supabase Upload]', err.message || err);
     return false;
   }
 }
@@ -218,6 +235,7 @@ async function getLatestState() {
       }
     } catch (dbErr) {
       console.error("[Supabase] Error al sincronizar en lectura (getLatestState):", dbErr);
+      notifyAdminError('[Supabase Sync]', dbErr.message || dbErr);
     }
   }
 
@@ -247,6 +265,15 @@ async function sendTelegramMessage(chatId, text) {
     return false;
   }
 }
+
+// Envía un mensaje de error crítico al administrador
+async function notifyAdminError(context, errorMessage) {
+  const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID || process.env.TELEGRAM_CHAT_ID;
+  if (!adminChatId) return;
+  const text = `🚨 *ALERTA CRÍTICA* 🚨\n*Contexto:* ${context}\n*Detalle:* ${errorMessage}`;
+  await sendTelegramMessage(adminChatId, text);
+}
+
 
 // Mapea el texto del banco o método recibido a un cuenta_id o tarjeta_id real
 function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
@@ -288,19 +315,27 @@ function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
     
     // Fallbacks específicos de débito/billeteras
     if (query.includes('yape')) {
-      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === 'Yo');
+      const isAndrea = query.includes('andrea');
+      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
       if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
     }
     if (query.includes('plin')) {
-      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === 'Yo');
+      const isAndrea = query.includes('andrea');
+      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
       if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
     }
     if (query.includes('bcp')) {
-      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === 'Yo');
+      const isAndrea = query.includes('andrea');
+      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
       if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
     }
     if (query.includes('interbank')) {
-      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === 'Yo');
+      const isAndrea = query.includes('andrea');
+      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
       if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
     }
   }
@@ -736,6 +771,22 @@ async function handleAutoRegister(req, res) {
     }
   }
 
+  // Comprobar desduplicación por similitud (para evitar duplicados cuando Apps Script da timeout y reintenta)
+  const cincoMinutosAtras = new Date(Date.now() - 5 * 60000);
+  const isPendingSimilar = (state.transacciones_pendientes || []).some(t => {
+    if (!t.created_at) return false;
+    const isRecent = new Date(t.created_at) > cincoMinutosAtras;
+    return isRecent && 
+           t.monto === parseFloat(monto) && 
+           t.banco_o_metodo === banco_o_metodo && 
+           t.descripcion_original === descripcion_original;
+  });
+
+  if (isPendingSimilar) {
+    console.log(`[Auto-Register] Transacción duplicada por similitud en los últimos 5 min ignorada.`);
+    return res.json({ ok: true, message: "Transacción duplicada por similitud ignorada.", duplicate: true });
+  }
+
   const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank'].some(keyword => 
     banco_o_metodo.toLowerCase().includes(keyword)
   );
@@ -987,6 +1038,12 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
 
       const categoriesList = Object.keys(state.categorias || {}).join(', ');
+      
+      const pendingReminders = (state.recordatorios || []).filter(r => r.estado === "Pendiente");
+      const remindersText = pendingReminders.length > 0 
+        ? pendingReminders.map(r => `ID: ${r.id} | Nombre: "${r.nombre}" | Monto habitual: ${r.monto}`).join('\n')
+        : "No hay recordatorios pendientes.";
+
       const sysPrompt = `
 Eres el asistente financiero de Jano. El usuario realizó un pago pendiente de registrar:
 Monto: ${pendingTx.monto} ${pendingTx.moneda}
@@ -997,11 +1054,15 @@ El usuario ha escrito la descripción corta o destino de ese gasto: "${text}"
 Basándote en esto, debes:
 1. Clasificarlo en una de estas categorías exactas: [${categoriesList}]. Si no estás seguro, usa "Otros".
 2. Redactar una descripción final amigable y limpia (ej: "Compra de frutas (Carlos)" o "Almuerzo en restaurante").
+3. IMPORTANTÍSIMO: Evalúa si este pago corresponde a alguno de estos recordatorios pendientes:
+${remindersText}
+Si la descripción que ingresó el usuario, el contexto o el monto sugieren claramente que está pagando uno de estos recordatorios, devuelve su ID numérico. Si no corresponde a NINGUNO de la lista, devuelve null.
 
 Responde únicamente con un objeto JSON válido con este formato:
 {
   "categoria": "<Categoría exacta>",
-  "descripcion": "<Descripción final>"
+  "descripcion": "<Descripción final>",
+  "recordatorio_pagado_id": <ID numérico o null>
 }
 No devuelvas nada más que el JSON limpio.
 `;
@@ -1048,6 +1109,7 @@ No devuelvas nada más que el JSON limpio.
             console.error("[Telegram-Webhook] Error parseando JSON de Gemini.");
             console.error("String crudo:", rawText);
             console.error("String limpio:", cleanStr);
+            notifyAdminError('[Telegram-Webhook JSON Parse]', `Error: ${parseErr.message}\nJSON: ${cleanStr.substring(0, 100)}`);
             // Intento de fallback básico si falló por comillas internas
             await sendTelegramMessage(chatId, `⚠️ Hubo un problema al entender la respuesta (Error de formato).\nTexto: ${cleanStr.substring(0, 150)}`);
             return res.sendStatus(200);
@@ -1061,6 +1123,25 @@ No devuelvas nada más que el JSON limpio.
           state.transacciones = state.transacciones || [];
           state.transacciones.unshift(pendingTx);
 
+          // NUEVO: Pagar recordatorio automáticamente si la IA lo detectó
+          let reminderMsgAddon = "";
+          if (parsed.recordatorio_pagado_id && state.recordatorios) {
+            const remIdx = state.recordatorios.findIndex(r => parseInt(r.id) === parseInt(parsed.recordatorio_pagado_id));
+            if (remIdx >= 0) {
+              const rem = state.recordatorios[remIdx];
+              if (rem.tipo !== "Tarjeta") {
+                 rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
+                 rem.estado = "Pendiente";
+                 reminderMsgAddon = `\n🔔 _Recordatorio "${rem.nombre}" adelantado un mes._`;
+                 console.log(`[Telegram-Webhook] Recordatorio adelantado: ${rem.nombre} al ${rem.fecha_vencimiento}`);
+              } else {
+                 rem.estado = "Pagado";
+                 reminderMsgAddon = `\n🔔 _Recordatorio de Tarjeta "${rem.nombre}" marcado como pagado._`;
+                 console.log(`[Telegram-Webhook] Recordatorio de Tarjeta marcado como Pagado: ${rem.nombre}`);
+              }
+            }
+          }
+
           // Lógica de transferencia automática entre cuentas internas
           const normalizeString = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const catNorm = normalizeString(pendingTx.categoria);
@@ -1068,30 +1149,39 @@ No devuelvas nada más que el JSON limpio.
           
           if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id) {
             const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
-            const targetName = descNorm.includes("andrea") ? "Andrea" : (descNorm.includes("jano") ? "Jano" : null);
             
-            if (sourceAccount && targetName) {
-              // Buscar la cuenta destino que pertenezca a la otra persona y sea del mismo banco
-              const targetAccount = (state.cuentas || []).find(c => 
-                normalizeString(c.nombre).includes(normalizeString(targetName)) && 
-                c.banco === sourceAccount.banco
-              );
+            if (sourceAccount) {
+              const isSourceAndrea = sourceAccount.titular === "Andrea";
+              let targetName = null;
               
-              if (targetAccount) {
-                const txEspejo = {
-                  id: pendingTx.id + 1,
-                  fecha: pendingTx.fecha,
-                  tipo: "INGRESO",
-                  categoria: "Transferencia",
-                  descripcion: `Transferencia automática de ${targetName === "Andrea" ? "Jano" : "Andrea"}`,
-                  monto: pendingTx.monto,
-                  moneda: pendingTx.moneda,
-                  cuenta_id: targetAccount.id,
-                  tarjeta_id: null,
-                  fijo: "Variable"
-                };
-                state.transacciones.unshift(txEspejo);
-                console.log(`[Transferencia Automática] Creado ingreso espejo de ${pendingTx.monto} en cuenta destino: ${targetAccount.nombre}`);
+              if ((descNorm.includes("jano") || descNorm.includes("a jano")) && isSourceAndrea) {
+                targetName = "Jano";
+              } else if ((descNorm.includes("andrea") || descNorm.includes("a andrea")) && !isSourceAndrea) {
+                targetName = "Andrea";
+              }
+
+              if (targetName) {
+                const targetAccount = (state.cuentas || []).find(c => 
+                  c.titular === targetName && c.banco === sourceAccount.banco
+                );
+                
+                if (targetAccount) {
+                  const txEspejo = {
+                    id: pendingTx.id + 1,
+                    fecha: pendingTx.fecha,
+                    tipo: "INGRESO",
+                    categoria: "Transferencia",
+                    descripcion: `Transferencia recibida de ${isSourceAndrea ? "Andrea" : "Jano"}`,
+                    monto: pendingTx.monto,
+                    moneda: pendingTx.moneda,
+                    cuenta_id: targetAccount.id,
+                    tarjeta_id: null,
+                    fijo: "Variable"
+                  };
+                  state.transacciones.unshift(txEspejo);
+                  pendingTx.descripcion = `Transferencia enviada a ${targetName}`;
+                  console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
+                }
               }
             }
           }
@@ -1102,7 +1192,7 @@ No devuelvas nada más que el JSON limpio.
           }
           saveLocalDataSync(state);
 
-          await sendTelegramMessage(chatId, `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto.toFixed(2)}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_`);
+          await sendTelegramMessage(chatId, `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto.toFixed(2)}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_${reminderMsgAddon}`);
         } else {
           const errText = await response.text();
           console.error("[Telegram-Webhook] Gemini API devolvió error:", response.status, errText);
