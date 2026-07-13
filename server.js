@@ -1096,30 +1096,42 @@ No devuelvas nada más que el JSON limpio.
 `;
 
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`;
+        // Ante un 503 (modelo saturado) no sirve martillar el mismo modelo: se cae a
+        // un modelo alternativo. Pocos reintentos por modelo para no bloquear el webhook
+        // >30s, porque Telegram reentrega el update y dispara doble procesamiento.
+        const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash'];
         let response;
         let resJson;
-        let retries = 10;
 
-        while (retries > 0) {
-          response = await fetch(url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey
-            },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: sysPrompt }] }]
-            })
-          });
+        for (const modelName of modelsToTry) {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+          let retries = 2;
+          let overloaded = false;
+          while (retries > 0) {
+            response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKey
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: sysPrompt }] }]
+              })
+            });
 
-          if (response.status === 503 || response.status === 429) {
-            console.warn(`[Telegram-Webhook] Gemini saturado (${response.status}). Reintentando en 3s... (Quedan ${retries - 1} intentos)`);
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            retries--;
-          } else {
-            break;
+            if (response.status === 503 || response.status === 429) {
+              overloaded = true;
+              console.warn(`[Telegram-Webhook] ${modelName} saturado (${response.status}). Quedan ${retries - 1} reintentos en este modelo.`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              retries--;
+            } else {
+              overloaded = false;
+              break;
+            }
           }
+          // Si respondió (ok, o error que no es saturación) no probamos el siguiente modelo.
+          if (!overloaded) break;
+          console.warn(`[Telegram-Webhook] ${modelName} sigue saturado; probando modelo alternativo...`);
         }
 
         if (response.ok) {
