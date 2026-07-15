@@ -1023,7 +1023,35 @@ app.post('/api/telegram-webhook', async (req, res) => {
     state.transacciones_pendientes = state.transacciones_pendientes || [];
 
     const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const isCancelWord = 
+
+    // Comando para vaciar TODA la cola de pendientes de una (\u00fatil para limpiar backlog).
+    const isClearAllWord =
+      normalizedText === 'limpiar pendientes' ||
+      normalizedText === 'vaciar pendientes' ||
+      normalizedText === 'borrar pendientes' ||
+      normalizedText === 'limpiar todo' ||
+      normalizedText === 'cancelar todo' ||
+      normalizedText === 'vaciar' ||
+      (normalizedText.includes('limpiar') && normalizedText.includes('pendiente')) ||
+      (normalizedText.includes('vaciar') && normalizedText.includes('pendiente'));
+
+    if (isClearAllWord) {
+      const cuantos = state.transacciones_pendientes.length;
+      if (cuantos > 0) {
+        state.transacciones_pendientes = [];
+        state.updated_at = new Date().toISOString();
+        if (SUPABASE_URL && SUPABASE_KEY) {
+          await uploadToSupabase(state);
+        }
+        saveLocalDataSync(state);
+        await sendTelegramMessage(chatId, `\ud83e\uddf9 Cola de pendientes vaciada: se descartaron *${cuantos}* gasto(s) sin registrar. (Esto no afecta tus transacciones ya guardadas.)`);
+      } else {
+        await sendTelegramMessage(chatId, "No tienes transacciones pendientes.");
+      }
+      return res.sendStatus(200);
+    }
+
+    const isCancelWord =
       normalizedText === 'cancelar' || 
       normalizedText === 'descartar' || 
       normalizedText === 'error' || 
