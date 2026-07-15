@@ -1025,15 +1025,17 @@ app.post('/api/telegram-webhook', async (req, res) => {
     const normalizedText = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
     // Comando para vaciar TODA la cola de pendientes de una (\u00fatil para limpiar backlog).
+    // Acepta cualquier verbo de limpieza + "pendiente(s)"/"todo", o "vaciar" a secas.
+    const clearVerb =
+      normalizedText.includes('limpiar') ||
+      normalizedText.includes('vaciar') ||
+      normalizedText.includes('borrar') ||
+      normalizedText.includes('cancelar') ||
+      normalizedText.includes('descartar') ||
+      normalizedText.includes('eliminar');
     const isClearAllWord =
-      normalizedText === 'limpiar pendientes' ||
-      normalizedText === 'vaciar pendientes' ||
-      normalizedText === 'borrar pendientes' ||
-      normalizedText === 'limpiar todo' ||
-      normalizedText === 'cancelar todo' ||
       normalizedText === 'vaciar' ||
-      (normalizedText.includes('limpiar') && normalizedText.includes('pendiente')) ||
-      (normalizedText.includes('vaciar') && normalizedText.includes('pendiente'));
+      (clearVerb && (normalizedText.includes('pendiente') || normalizedText.includes('todo') || normalizedText.includes('todos')));
 
     if (isClearAllWord) {
       const cuantos = state.transacciones_pendientes.length;
