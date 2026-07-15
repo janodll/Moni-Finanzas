@@ -90,7 +90,10 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
   "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>"
 }
 
-REGLA DE ORO PARA EL BANCO_O_METODO: Debes deducir el banco (BCP, Interbank, BBVA, Falabella, Yape, Plin) y SIEMPRE agregarle la palabra "Andrea" al final (Por ejemplo: "BCP Andrea", "Interbank Andrea", "CMR Falabella"). Esto es crítico para diferenciar sus cuentas de las de su esposo.
+REGLA DE ORO PARA EL BANCO_O_METODO: Deduce el banco y agrégale "Andrea" al final. CRÍTICO — distingue TARJETA DE CRÉDITO vs CUENTA/DÉBITO, porque un mismo banco puede tener ambas:
+- Si el correo es un CONSUMO/PAGO CON TARJETA DE CRÉDITO (menciona "Tarjeta de Crédito", "Visa", "Mastercard", "realizaste un consumo con tu Tarjeta", o un nombre de tarjeta como Clásica/Oro/Premia/Signature/Platinum), ANTEPÓN la palabra "Tarjeta": por ejemplo "Tarjeta Interbank Andrea", "Tarjeta BBVA Andrea". Falabella siempre es tarjeta: usa "CMR Falabella".
+- Si es DÉBITO, cuenta de ahorros, Yape, Plin o transferencia, usa solo el banco: "BCP Andrea", "Interbank Andrea".
+Esto es crítico para diferenciar tarjeta de crédito, cuenta de débito, y de las de su esposo.
 
 REGLA DE FORMATO: No uses saltos de línea (enters) ni comillas dobles en los valores del JSON.
 

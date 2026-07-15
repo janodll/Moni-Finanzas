@@ -284,16 +284,29 @@ async function notifyAdminError(context, errorMessage) {
 // Mapea el texto del banco o método recibido a un cuenta_id o tarjeta_id real
 function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
   const query = (banco_o_metodo || '').toLowerCase();
-  
+
+  // Elige la tarjeta/cuenta de la persona correcta cuando el banco existe para ambos
+  // (ej. Interbank tiene tarjeta de Jano Y de Andrea). Si el query no nombra persona,
+  // no restringe.
+  // Rechaza solo si el nombre pertenece a la OTRA persona (una tarjeta sin persona en
+  // el nombre, ej. "Tarjeta BBVA", se acepta igual).
+  const personOk = (name) => {
+    if (query.includes('andrea')) return !name.includes('jano');
+    if (query.includes('jano')) return !name.includes('andrea');
+    return true;
+  };
+
   if (isCreditCard || query.includes('tarjeta') || query.includes('cmr') || query.includes('falabella')) {
-    // Buscar en tarjetas
+    // Buscar en tarjetas (respetando la persona)
     for (const t of state.tarjetas || []) {
       const name = t.nombre.toLowerCase();
-      if (name.includes(query) || 
-          (query.includes('cmr') && name.includes('falabella')) || 
+      const matchesBank =
+          name.includes(query) ||
+          (query.includes('cmr') && name.includes('falabella')) ||
           (query.includes('falabella') && name.includes('cmr')) ||
           (query.includes('bbva') && name.includes('bbva')) ||
-          (query.includes('interbank') && name.includes('interbank'))) {
+          (query.includes('interbank') && name.includes('interbank'));
+      if (matchesBank && personOk(name)) {
         return { cuenta_id: null, tarjeta_id: t.id };
       }
     }
@@ -303,11 +316,11 @@ function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
       if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
     }
     if (query.includes('bbva')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('bbva'));
+      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('bbva') && personOk(t.nombre.toLowerCase()));
       if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
     }
     if (query.includes('interbank')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('interbank') && t.titular === 'Yo');
+      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('interbank') && personOk(t.nombre.toLowerCase()));
       if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
     }
   } else {
