@@ -556,7 +556,10 @@ function executeActionOnState(actionType, data, state) {
 // si tardas). Devuelve el Response del primer modelo que responde (ok o error que no es
 // saturación), o el último Response si todos siguen saturados.
 async function geminiGenerateContent(apiKey, body, label = 'Gemini') {
-  const modelsToTry = ['gemini-flash-latest', 'gemini-2.5-flash'];
+  // gemini-flash-latest = flash GA actual; gemini-3.1-flash-lite = modelo ligero
+  // vivo, con más capacidad, como alternativa cuando el flash principal se satura (503).
+  // (No usar gemini-2.5-flash: descontinuado por Google en jul-2026.)
+  const modelsToTry = ['gemini-flash-latest', 'gemini-3.1-flash-lite'];
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
   let response;
   for (const modelName of modelsToTry) {
@@ -1238,7 +1241,7 @@ No devuelvas nada más que el JSON limpio.
         } else {
           const errText = await response.text();
           console.error("[Telegram-Webhook] Gemini API devolvió error:", response.status, errText);
-          await sendTelegramMessage(chatId, "⚠️ Hubo un problema al conectar con Gemini. Intenta responder de nuevo.");
+          await sendTelegramMessage(chatId, "⏳ Gemini está saturado ahora mismo (error temporal de Google). El gasto sigue *pendiente* y no se perdió — responde de nuevo en un par de minutos.");
         }
       } catch (err) {
         console.error("[Telegram-Webhook] Error en IA:", err);
