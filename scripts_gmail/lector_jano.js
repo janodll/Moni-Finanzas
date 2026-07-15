@@ -42,10 +42,11 @@ function fetchGeminiConFallback(payload) {
 
 function procesarCorreosMoni() {
   // Busca correos no leídos de los bancos
-  // Interbank envía las notificaciones de consumo desde "netinterbank.com.pe"; Gmail hace
-  // match por prefijo de token, así que "from:interbank" NO captura "netinterbank". Se añade
-  // explícitamente. (Verificado: sin esto, los consumos de la TC Interbank no se detectaban.)
-  const query = 'is:unread newer_than:1d (from:yape OR from:plin OR from:bcp OR from:interbank OR from:netinterbank OR from:bbva OR from:falabella)';
+  // Se busca el nombre del banco en TODO el correo (no solo el remitente) para no depender
+  // del dominio exacto: si un banco cambia de dominio (p.ej. Interbank usa netinterbank.com.pe),
+  // igual se captura porque el cuerpo siempre menciona el banco. Los promos que entren de más
+  // los descarta la IA con {"tipo":"IGNORAR"}. Mismo enfoque que el lector de Andrea.
+  const query = 'is:unread newer_than:1d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank)';
   const hilos = GmailApp.search(query, 0, 10);
   
   if (hilos.length === 0) {
