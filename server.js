@@ -1211,8 +1211,30 @@ No devuelvas nada más que el JSON limpio.
                  console.log(`[Telegram-Webhook] Recordatorio adelantado: ${rem.nombre} al ${rem.fecha_vencimiento}`);
               } else {
                  rem.estado = "Pagado";
-                 reminderMsgAddon = `\n🔔 _Recordatorio de Tarjeta "${rem.nombre}" marcado como pagado._`;
-                 console.log(`[Telegram-Webhook] Recordatorio de Tarjeta marcado como Pagado: ${rem.nombre}`);
+                 // Un pago de tarjeta debe: (1) salir de una cuenta de débito (el GASTO = pendingTx),
+                 // y (2) REDUCIR la deuda de la tarjeta pagada (INGRESO a rem.tarjeta_id), igual que
+                 // el modal web. Antes solo se marcaba "Pagado" y la deuda nunca bajaba; peor, si el
+                 // pendingTx traía tarjeta_id de otra tarjeta, el GASTO le AUMENTABA la deuda.
+                 pendingTx.categoria = "Pago Tarjeta";
+                 pendingTx.tipo = "GASTO";
+                 pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta otra tarjeta
+                 const tarjetaPagadaId = rem.tarjeta_id ? parseInt(rem.tarjeta_id) : null;
+                 if (tarjetaPagadaId) {
+                   state.transacciones.unshift({
+                     id: pendingTx.id + 1,
+                     fecha: pendingTx.fecha,
+                     tipo: "INGRESO",
+                     categoria: "Pago Tarjeta",
+                     descripcion: `Pago de Tarjeta ${rem.nombre}`,
+                     monto: pendingTx.monto,
+                     moneda: pendingTx.moneda,
+                     cuenta_id: null,
+                     tarjeta_id: tarjetaPagadaId,
+                     fijo: "Variable"
+                   });
+                 }
+                 reminderMsgAddon = `\n🔔 _Tarjeta "${rem.nombre}" pagada: deuda reducida en ${pendingTx.moneda || 'S/.'} ${pendingTx.monto}._`;
+                 console.log(`[Telegram-Webhook] Pago de tarjeta ${rem.nombre}: INGRESO creado a tarjeta ${tarjetaPagadaId} para reducir deuda.`);
               }
             }
           }
