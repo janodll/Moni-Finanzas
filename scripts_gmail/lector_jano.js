@@ -9,6 +9,37 @@ const MONI_API_TOKEN = props.getProperty('MONI_API_TOKEN');
 const TELEGRAM_BOT_TOKEN = props.getProperty('TELEGRAM_BOT_TOKEN');
 const TELEGRAM_CHAT_ID = props.getProperty('TELEGRAM_CHAT_ID');
 
+// Llama a Gemini probando varios modelos ante 503/429 (modelo saturado del lado de
+// Google). Reintentar el mismo modelo saturado no sirve; se cae a uno alterno vivo.
+// (gemini-2.5-flash fue descontinuado; no usar.)
+function fetchGeminiConFallback(payload) {
+  const modelos = ['gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+  let response;
+  for (const modelo of modelos) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${GEMINI_API_KEY}`;
+    let retries = 3;
+    while (retries > 0) {
+      response = UrlFetchApp.fetch(url, options);
+      const code = response.getResponseCode();
+      if (code === 503 || code === 429) {
+        Logger.log(`${modelo} saturado (${code}). Reintentando en 2s... Quedan: ${retries - 1}`);
+        Utilities.sleep(2000);
+        retries--;
+      } else {
+        return response; // respondió (200 u otro error real): no probar más modelos
+      }
+    }
+    Logger.log(`${modelo} sigue saturado; probando modelo alternativo...`);
+  }
+  return response; // último intento (probablemente 503) si todos siguen saturados
+}
+
 function procesarCorreosMoni() {
   // Busca correos no leídos de los bancos
   const query = 'is:unread newer_than:1d (from:yape OR from:plin OR from:bcp OR from:interbank OR from:bbva OR from:falabella)';
@@ -67,33 +98,12 @@ CUERPO: ${cuerpo}
 No devuelvas nada más que el JSON limpio, sin bloques de código markdown.
 `;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
-  
   const payload = {
     contents: [{ parts: [{ text: prompt }] }],
     generationConfig: { responseMimeType: "application/json" }
   };
 
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  let response;
-  let retries = 10;
-  
-  while (retries > 0) {
-    response = UrlFetchApp.fetch(url, options);
-    if (response.getResponseCode() === 503 || response.getResponseCode() === 429) {
-      Logger.log("Gemini saturado. Reintentando en 3s... Quedan: " + (retries - 1));
-      Utilities.sleep(3000);
-      retries--;
-    } else {
-      break;
-    }
-  }
+  const response = fetchGeminiConFallback(payload);
 
   if (response.getResponseCode() === 200) {
     const resJson = JSON.parse(response.getContentText());
