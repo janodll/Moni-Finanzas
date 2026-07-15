@@ -42,7 +42,10 @@ function fetchGeminiConFallback(payload) {
 
 function procesarCorreosMoni() {
   // Busca correos no leídos de los bancos
-  const query = 'is:unread newer_than:1d (from:yape OR from:plin OR from:bcp OR from:interbank OR from:bbva OR from:falabella)';
+  // Interbank envía las notificaciones de consumo desde "netinterbank.com.pe"; Gmail hace
+  // match por prefijo de token, así que "from:interbank" NO captura "netinterbank". Se añade
+  // explícitamente. (Verificado: sin esto, los consumos de la TC Interbank no se detectaban.)
+  const query = 'is:unread newer_than:1d (from:yape OR from:plin OR from:bcp OR from:interbank OR from:netinterbank OR from:bbva OR from:falabella)';
   const hilos = GmailApp.search(query, 0, 10);
   
   if (hilos.length === 0) {
