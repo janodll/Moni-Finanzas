@@ -146,6 +146,13 @@ No devuelvas nada más que el JSON limpio, sin bloques de código markdown.
       Logger.log("IA extrajo (Jano): " + JSON.stringify(parsedData));
       return enviarAMoniBackend(parsedData);
     } else {
+      // El parseo falló. Si la respuesta claramente pedía IGNORAR (correo promocional/spam),
+      // trátalo como ignorado: márcalo leído y NO alertes (evita spam de alertas y reintentos).
+      // La alerta queda solo para fallos en correos que parecían transacciones reales.
+      if (/ignorar/i.test(originalStr)) {
+        Logger.log("JSON malformado pero la IA quería IGNORAR (correo promocional). Ignorado sin alerta.");
+        return true;
+      }
       Logger.log("Fallo total al parsear JSON.");
       enviarAlertaTelegram(`Fallo parseo JSON Gemini.\nAsunto: ${asunto}\nError: No se pudo encontrar un JSON válido.\nRespuesta cruda: ${originalStr.substring(0, 100)}`);
       return false;
