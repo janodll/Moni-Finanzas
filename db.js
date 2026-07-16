@@ -1,11 +1,14 @@
 // db.js — acceso a la tabla de transacciones en Supabase (PostgREST, sin librerías nuevas)
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-
+//
+// SUPABASE_URL/KEY se leen de process.env en cada llamada (no como const de módulo):
+// server.js carga .env manualmente para uso local, y ese import de db.js se evalúa
+// antes de que ese parseo corra, así que capturarlas al importar dejaría siempre
+// undefined en local (en Render sí llegan seteadas antes de arrancar node).
 function headers(extra = {}) {
+  const SUPABASE_KEY = process.env.SUPABASE_KEY;
   return { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json', ...extra };
 }
-const BASE = () => `${SUPABASE_URL}/rest/v1/transacciones`;
+const BASE = () => `${process.env.SUPABASE_URL}/rest/v1/transacciones`;
 
 // Trae todas las transacciones (más nuevas primero, como el unshift de antes)
 export async function dbGetTransacciones() {
