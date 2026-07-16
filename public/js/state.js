@@ -264,14 +264,17 @@ export async function saveState() {
     return;
   }
 
+  const payload = { ...state };
+  delete payload.transacciones; // las transacciones se guardan por sus propios endpoints
+
   try {
     const response = await fetch(`${API_BASE}/api/data`, {
       method: 'POST',
-      headers: { 
+      headers: {
         'Content-Type': 'application/json',
         'X-Local-Token': LOCAL_TOKEN
       },
-      body: JSON.stringify(state)
+      body: JSON.stringify(payload)
     });
     if (response.status === 401) {
       console.warn("Token local incorrecto o expirado al guardar.");
@@ -297,6 +300,20 @@ export async function saveState() {
   
   updateUI();
 }
+
+// Endpoints dedicados de transacciones (la tabla en Supabase, no el blob)
+async function txApi(url, method, body) {
+  const r = await fetch(`${API_BASE}${url}`, {
+    method, headers: { 'Content-Type': 'application/json', 'X-Local-Token': LOCAL_TOKEN },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!r.ok) throw new Error('Error de red al guardar la transacción');
+  return await r.json();
+}
+export async function apiAddTransaccion(tx)      { return (await txApi('/api/transaccion', 'POST', tx)).data; }
+export async function apiAddPar(gasto, ingreso)  { return (await txApi('/api/transaccion/par', 'POST', { gasto, ingreso })).data; }
+export async function apiUpdateTransaccion(id, f){ return (await txApi(`/api/transaccion/${id}`, 'PUT', f)).data; }
+export async function apiDeleteTransaccion(id, transferId) { const q = transferId ? `?transfer_id=${transferId}` : ''; return txApi(`/api/transaccion/${id}${q}`, 'DELETE'); }
 
 export function generateUniqueId() {
   const allIds = [
