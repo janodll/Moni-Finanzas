@@ -1,10 +1,10 @@
 // Historial de Transacciones, Paginación, Filtros y Exportación de Moni
 
-import { state, CATEGORY_STYLES, setEditingTransactionId, saveState } from '../state.js';
+import { state, CATEGORY_STYLES, setEditingTransactionId, saveState, isLocalStorageMode, apiAddTransaccion, apiAddPar, apiDeleteTransaccion } from '../state.js';
 import { formatNumber, formatDateStr, getCurrentMonthString, getMontoEnSoles } from '../calculations.js';
-import { safeCreateIcons, escapeHTML, showUndoToast } from './components.js';
+import { safeCreateIcons, escapeHTML, showUndoToast, showToast } from './components.js';
 import { getOrigenLabel } from './dashboard.js';
-import { populateFormSelects, filterCategorySelect } from '../main.js';
+import { populateFormSelects, filterCategorySelect, updateUI } from '../main.js';
 
 export const pagination = {
   currentPage: 1,
@@ -329,35 +329,78 @@ export function renderTransactionsTable() {
 
 // Eliminar transacción (v6: inmediato y reversible con Deshacer;
 // si es pierna de una transferencia, se elimina el par completo)
-export function deleteTransaction(id) {
+export async function deleteTransaction(id) {
   const idx = state.transacciones.findIndex(tx => parseInt(tx.id) === id);
   if (idx < 0) return;
   const tx = state.transacciones[idx];
 
+  // Quita id/transfer_id/created_at para poder re-insertar como fila nueva al deshacer
+  const clean = (t) => { const { id, transfer_id, created_at, ...rest } = t; return rest; };
+
   if (tx.transfer_id) {
     // Eliminar ambas piernas de la transferencia
     const removidas = state.transacciones.filter(t => t.transfer_id === tx.transfer_id);
-    state.transacciones = state.transacciones.filter(t => t.transfer_id !== tx.transfer_id);
-    saveState();
+
+    try {
+      if (isLocalStorageMode) {
+        state.transacciones = state.transacciones.filter(t => t.transfer_id !== tx.transfer_id);
+        saveState();
+      } else {
+        await apiDeleteTransaccion(tx.id, tx.transfer_id);
+        state.transacciones = state.transacciones.filter(t => t.transfer_id !== tx.transfer_id);
+        updateUI();
+      }
+    } catch (err) {
+      showToast("Error de conexión", "No se pudo eliminar la transferencia. Intenta de nuevo.", "error");
+      return;
+    }
+
     showUndoToast(
       "Transferencia eliminada",
       `Se eliminaron ambos movimientos del traspaso (${removidas[0]?.monto}).`,
-      () => {
-        state.transacciones.unshift(...removidas);
-        saveState();
+      async () => {
+        if (isLocalStorageMode) {
+          state.transacciones.unshift(...removidas);
+          saveState();
+        } else {
+          const gasto = clean(removidas.find(t => t.tipo === "GASTO") || removidas[0]);
+          const ingreso = clean(removidas.find(t => t.tipo === "INGRESO") || removidas[1]);
+          const r = await apiAddPar(gasto, ingreso);
+          if (r?.gasto) state.transacciones.unshift(r.gasto);
+          if (r?.ingreso) state.transacciones.unshift(r.ingreso);
+          updateUI();
+        }
       }
     );
     return;
   }
 
-  const removed = state.transacciones.splice(idx, 1)[0];
-  saveState();
+  try {
+    if (isLocalStorageMode) {
+      state.transacciones.splice(idx, 1);
+      saveState();
+    } else {
+      await apiDeleteTransaccion(tx.id);
+      state.transacciones.splice(idx, 1);
+      updateUI();
+    }
+  } catch (err) {
+    showToast("Error de conexión", "No se pudo eliminar la transacción. Intenta de nuevo.", "error");
+    return;
+  }
+
   showUndoToast(
     "Transacción eliminada",
-    `${removed.descripcion || removed.categoria} (${removed.tipo === "GASTO" ? "-" : "+"}${removed.monto})`,
-    () => {
-      state.transacciones.splice(idx, 0, removed);
-      saveState();
+    `${tx.descripcion || tx.categoria} (${tx.tipo === "GASTO" ? "-" : "+"}${tx.monto})`,
+    async () => {
+      if (isLocalStorageMode) {
+        state.transacciones.splice(idx, 0, tx);
+        saveState();
+      } else {
+        const saved = await apiAddTransaccion(clean(tx));
+        if (saved) state.transacciones.unshift(saved);
+        updateUI();
+      }
     }
   );
 }

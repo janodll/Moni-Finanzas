@@ -1,15 +1,18 @@
 // Punto de entrada y Orquestador de UI SPA de Moni
 
-import { 
-  state, 
-  CATEGORY_STYLES, 
-  initLocalAuth, 
-  fetchData, 
-  saveState, 
-  isLocalStorageMode, 
-  editingTransactionId, 
+import {
+  state,
+  CATEGORY_STYLES,
+  initLocalAuth,
+  fetchData,
+  saveState,
+  isLocalStorageMode,
+  editingTransactionId,
   setEditingTransactionId,
-  generateUniqueId
+  generateUniqueId,
+  apiAddTransaccion,
+  apiAddPar,
+  apiUpdateTransaccion
 } from './state.js';
 import { 
   calculateBalances, 
@@ -381,7 +384,7 @@ export function setupQuickBatch() {
   });
 
   if (btnSave) {
-    btnSave.addEventListener("click", () => {
+    btnSave.addEventListener("click", async () => {
       const rows = [...container.querySelectorAll(".batch-row")];
       const nuevas = [];
 
@@ -413,11 +416,24 @@ export function setupQuickBatch() {
         return;
       }
 
-      let nextId = generateUniqueId();
-      nuevas.forEach(tx => state.transacciones.unshift({ id: nextId++, ...tx }));
+      if (isLocalStorageMode) {
+        let nextId = generateUniqueId();
+        nuevas.forEach(tx => state.transacciones.unshift({ id: nextId++, ...tx }));
+        saveState();
+      } else {
+        try {
+          for (const tx of nuevas) {
+            const saved = await apiAddTransaccion(tx);
+            if (saved) state.transacciones.unshift(saved);
+          }
+          updateUI();
+        } catch (err) {
+          showToast("Error de conexión", "No se pudieron guardar los movimientos. Intenta de nuevo.", "error");
+          return;
+        }
+      }
 
       modal.classList.remove("active");
-      saveState();
       showToast("Registro Rápido", `${nuevas.length} movimiento${nuevas.length > 1 ? 's' : ''} registrado${nuevas.length > 1 ? 's' : ''} con éxito.`, "success");
     });
   }
@@ -600,9 +616,9 @@ export function setupFormSubmits() {
   // 1. REGISTRAR O EDITAR TRANSACCIÓN
   const formTx = document.getElementById("form-transaccion");
   if (formTx) {
-    formTx.addEventListener("submit", (e) => {
+    formTx.addEventListener("submit", async (e) => {
       e.preventDefault();
-      
+
       const tipo = document.getElementById("tx-tipo").value;
       const fecha = document.getElementById("tx-fecha").value;
       const monto = parseFloat(document.getElementById("tx-monto").value);
@@ -610,7 +626,7 @@ export function setupFormSubmits() {
       const categoria = document.getElementById("tx-categoria").value;
       const descripcion = document.getElementById("tx-descripcion").value;
       const fijo = document.getElementById("tx-fijo").value;
-      
+
       const origenRaw = document.getElementById("tx-origen").value;
       let cuenta_id = null;
       let tarjeta_id = null;
@@ -621,47 +637,46 @@ export function setupFormSubmits() {
         tarjeta_id = parseInt(origenRaw.replace("tarj-", ""));
       }
 
-      if (editingTransactionId !== null) {
-        const tx = state.transacciones.find(t => t.id === editingTransactionId);
-        if (tx) {
-          tx.tipo = tipo;
-          tx.fecha = fecha;
-          tx.monto = monto;
-          tx.moneda = moneda;
-          tx.categoria = categoria;
-          tx.descripcion = descripcion;
-          tx.cuenta_id = cuenta_id;
-          tx.tarjeta_id = tarjeta_id;
-          tx.fijo = fijo;
+      try {
+        if (editingTransactionId !== null) {
+          const campos = { tipo, fecha, monto, moneda, categoria, descripcion, cuenta_id, tarjeta_id, fijo };
+          if (isLocalStorageMode) {
+            const tx = state.transacciones.find(t => t.id === editingTransactionId);
+            if (tx) Object.assign(tx, campos);
+            saveState();
+          } else {
+            const updated = await apiUpdateTransaccion(editingTransactionId, campos);
+            const tx = state.transacciones.find(t => t.id === editingTransactionId);
+            if (tx && updated) Object.assign(tx, updated);
+            updateUI();
+          }
+          setEditingTransactionId(null);
+        } else {
+          const nuevaTx = { fecha, tipo, categoria, descripcion, monto, moneda, tarjeta_id, cuenta_id, fijo };
+          if (isLocalStorageMode) {
+            state.transacciones.unshift({ id: generateUniqueId(), ...nuevaTx });
+            saveState();
+          } else {
+            const saved = await apiAddTransaccion(nuevaTx);
+            if (saved) state.transacciones.unshift(saved);
+            updateUI();
+          }
         }
-        setEditingTransactionId(null);
-      } else {
-        const nuevaTx = {
-          id: generateUniqueId(),
-          fecha,
-          tipo,
-          categoria,
-          descripcion,
-          monto,
-          moneda,
-          tarjeta_id,
-          cuenta_id,
-          fijo
-        };
-        state.transacciones.unshift(nuevaTx);
+      } catch (err) {
+        showToast("Error de conexión", "No se pudo guardar la transacción. Intenta de nuevo.", "error");
+        return;
       }
-      
+
       document.getElementById("modal-transaccion").classList.remove("active");
-      saveState();
     });
   }
 
   // 2. REGISTRAR TRANSFERENCIA ENTRE CUENTAS
   const formTransf = document.getElementById("form-transferencia-modal");
   if (formTransf) {
-    formTransf.addEventListener("submit", (e) => {
+    formTransf.addEventListener("submit", async (e) => {
       e.preventDefault();
-      
+
       const fecha = document.getElementById("transf-fecha").value;
       const cOrig = parseInt(document.getElementById("transf-origen").value);
       const cDest = parseInt(document.getElementById("transf-destino").value);
@@ -678,11 +693,7 @@ export function setupFormSubmits() {
       const cOrigNombre = cOrigCta ? cOrigCta.nombre : "Origen";
       const cDestNombre = cDestCta ? cDestCta.nombre : "Destino";
 
-      // v6: ambas piernas comparten transfer_id para editarse/borrarse en par
-      const gastoId = generateUniqueId();
-
       const txGasto = {
-        id: gastoId,
         fecha,
         tipo: "GASTO",
         categoria: "Transferencia",
@@ -690,13 +701,10 @@ export function setupFormSubmits() {
         monto,
         tarjeta_id: null,
         cuenta_id: cOrig,
-        fijo: "Variable",
-        transfer_id: gastoId
+        fijo: "Variable"
       };
-      state.transacciones.unshift(txGasto);
 
       const txIngreso = {
-        id: generateUniqueId(),
         fecha,
         tipo: "INGRESO",
         categoria: "Transferencia",
@@ -704,12 +712,28 @@ export function setupFormSubmits() {
         monto,
         tarjeta_id: null,
         cuenta_id: cDest,
-        fijo: "Variable",
-        transfer_id: gastoId
+        fijo: "Variable"
       };
-      state.transacciones.unshift(txIngreso);
+
+      try {
+        if (isLocalStorageMode) {
+          // v6: ambas piernas comparten transfer_id para editarse/borrarse en par
+          const gastoId = generateUniqueId();
+          state.transacciones.unshift({ id: gastoId, ...txGasto, transfer_id: gastoId });
+          state.transacciones.unshift({ id: generateUniqueId(), ...txIngreso, transfer_id: gastoId });
+          saveState();
+        } else {
+          const r = await apiAddPar(txGasto, txIngreso);
+          if (r?.gasto) state.transacciones.unshift(r.gasto);
+          if (r?.ingreso) state.transacciones.unshift(r.ingreso);
+          updateUI();
+        }
+      } catch (err) {
+        showToast("Error de conexión", "No se pudo registrar la transferencia. Intenta de nuevo.", "error");
+        return;
+      }
+
       document.getElementById("modal-transferencia").classList.remove("active");
-      saveState();
     });
   }
 
@@ -785,7 +809,7 @@ export function setupFormSubmits() {
   // 6. GESTIONAR APORTE A METAS
   const formAporte = document.getElementById("form-ahorro-aporte");
   if (formAporte) {
-    formAporte.addEventListener("submit", (e) => {
+    formAporte.addEventListener("submit", async (e) => {
       e.preventDefault();
       const metaId = parseInt(document.getElementById("aporte-meta-id").value);
       const tipo = document.getElementById("aporte-tipo").value;
@@ -796,12 +820,11 @@ export function setupFormSubmits() {
       if (!meta) return;
 
       const todayStr = new Date().toISOString().substring(0, 10);
+      let tx;
 
       if (tipo === "APORTE") {
         meta.actual += monto;
-        
-        const txAporte = {
-          id: generateUniqueId(),
+        tx = {
           fecha: todayStr,
           tipo: "GASTO",
           categoria: "Ahorro",
@@ -811,16 +834,13 @@ export function setupFormSubmits() {
           cuenta_id: ctaId,
           fijo: "Variable"
         };
-        state.transacciones.unshift(txAporte);
       } else {
         if (meta.actual < monto) {
           showToast("Saldo insuficiente", "No puedes retirar más de lo que has ahorrado en esta meta.", "error");
           return;
         }
         meta.actual -= monto;
-
-        const txRetiro = {
-          id: generateUniqueId(),
+        tx = {
           fecha: todayStr,
           tipo: "INGRESO",
           categoria: "Ahorro",
@@ -830,18 +850,29 @@ export function setupFormSubmits() {
           cuenta_id: ctaId,
           fijo: "Variable"
         };
-        state.transacciones.unshift(txRetiro);
+      }
+
+      try {
+        if (isLocalStorageMode) {
+          state.transacciones.unshift({ id: generateUniqueId(), ...tx });
+        } else {
+          const saved = await apiAddTransaccion(tx);
+          if (saved) state.transacciones.unshift(saved);
+        }
+      } catch (err) {
+        showToast("Error de conexión", "No se pudo registrar el movimiento de la meta. Intenta de nuevo.", "error");
+        return;
       }
 
       document.getElementById("modal-ahorro-aporte").classList.remove("active");
-      saveState();
+      saveState(); // persiste el cambio de meta.actual (blob); la transacción ya se guardó arriba
     });
   }
 
   // 7. CONFIRMAR PAGO RECORDATORIO
   const formPayRem = document.getElementById("form-pagar-recordatorio");
   if (formPayRem) {
-    formPayRem.addEventListener("submit", (e) => {
+    formPayRem.addEventListener("submit", async (e) => {
       e.preventDefault();
       const remId = parseInt(document.getElementById("pay-rem-id").value);
       const monto = parseFloat(document.getElementById("pay-rem-monto").value);
@@ -855,49 +886,63 @@ export function setupFormSubmits() {
 
       const todayStr = new Date().toISOString().substring(0, 10);
 
-      if (rem.tipo === "Tarjeta") {
-        const tarjId = parseInt(document.getElementById("pay-rem-tarjeta").value);
-        const tarj = state.tarjetas.find(t => parseInt(t.id) === tarjId);
-        const tarjNombre = tarj ? tarj.nombre : "Tarjeta";
+      try {
+        if (rem.tipo === "Tarjeta") {
+          const tarjId = parseInt(document.getElementById("pay-rem-tarjeta").value);
+          const tarj = state.tarjetas.find(t => parseInt(t.id) === tarjId);
+          const tarjNombre = tarj ? tarj.nombre : "Tarjeta";
 
-        const txGasto = {
-          id: generateUniqueId(),
-          fecha: todayStr,
-          tipo: "GASTO",
-          categoria: "Pago Tarjeta",
-          descripcion: `Pago de Tarjeta ${tarjNombre}`,
-          monto,
-          tarjeta_id: null,
-          cuenta_id: ctaId,
-          fijo: "Variable"
-        };
-        state.transacciones.unshift(txGasto);
+          const txGasto = {
+            fecha: todayStr,
+            tipo: "GASTO",
+            categoria: "Pago Tarjeta",
+            descripcion: `Pago de Tarjeta ${tarjNombre}`,
+            monto,
+            tarjeta_id: null,
+            cuenta_id: ctaId,
+            fijo: "Variable"
+          };
+          const txIngreso = {
+            fecha: todayStr,
+            tipo: "INGRESO",
+            categoria: "Pago Tarjeta",
+            descripcion: `Pago de Tarjeta ${tarjNombre}`,
+            monto,
+            tarjeta_id: tarj ? tarj.id : null,
+            cuenta_id: null,
+            fijo: "Variable"
+          };
 
-        const txIngreso = {
-          id: generateUniqueId(),
-          fecha: todayStr,
-          tipo: "INGRESO",
-          categoria: "Pago Tarjeta",
-          descripcion: `Pago de Tarjeta ${tarjNombre}`,
-          monto,
-          tarjeta_id: tarj ? tarj.id : null,
-          cuenta_id: null,
-          fijo: "Variable"
-        };
-        state.transacciones.unshift(txIngreso);
-      } else {
-        const txServicio = {
-          id: generateUniqueId(),
-          fecha: todayStr,
-          tipo: "GASTO",
-          categoria: "Servicios",
-          descripcion: `Pago de servicio: ${rem.nombre}`,
-          monto,
-          tarjeta_id: null,
-          cuenta_id: ctaId,
-          fijo: "Fijo"
-        };
-        state.transacciones.unshift(txServicio);
+          if (isLocalStorageMode) {
+            state.transacciones.unshift({ id: generateUniqueId(), ...txGasto });
+            state.transacciones.unshift({ id: generateUniqueId(), ...txIngreso });
+          } else {
+            const r = await apiAddPar(txGasto, txIngreso);
+            if (r?.gasto) state.transacciones.unshift(r.gasto);
+            if (r?.ingreso) state.transacciones.unshift(r.ingreso);
+          }
+        } else {
+          const txServicio = {
+            fecha: todayStr,
+            tipo: "GASTO",
+            categoria: "Servicios",
+            descripcion: `Pago de servicio: ${rem.nombre}`,
+            monto,
+            tarjeta_id: null,
+            cuenta_id: ctaId,
+            fijo: "Fijo"
+          };
+
+          if (isLocalStorageMode) {
+            state.transacciones.unshift({ id: generateUniqueId(), ...txServicio });
+          } else {
+            const saved = await apiAddTransaccion(txServicio);
+            if (saved) state.transacciones.unshift(saved);
+          }
+        }
+      } catch (err) {
+        showToast("Error de conexión", "No se pudo registrar el pago. Intenta de nuevo.", "error");
+        return;
       }
 
       if (rem.tipo !== "Tarjeta") {
@@ -908,7 +953,7 @@ export function setupFormSubmits() {
       }
 
       document.getElementById("modal-pagar-recordatorio").classList.remove("active");
-      saveState();
+      saveState(); // persiste el cambio del recordatorio (blob); las transacciones ya se guardaron arriba
     });
   }
 
@@ -944,7 +989,7 @@ export function setupFormSubmits() {
   // 9. REGISTRAR COBRO FREELANCE
   const formCobrar = document.getElementById("form-cobrar-trabajo");
   if (formCobrar) {
-    formCobrar.addEventListener("submit", (e) => {
+    formCobrar.addEventListener("submit", async (e) => {
       e.preventDefault();
       const jobId = parseInt(document.getElementById("cobrar-job-id").value);
       const montoReal = parseFloat(document.getElementById("cobrar-monto-real").value);
@@ -960,7 +1005,6 @@ export function setupFormSubmits() {
       job.monto = montoReal;
 
       const nuevoIngreso = {
-        id: generateUniqueId(),
         fecha: fechaCobro,
         tipo: "INGRESO",
         categoria: "Sueldo",
@@ -971,9 +1015,20 @@ export function setupFormSubmits() {
         fijo: "Variable"
       };
 
-      state.transacciones.unshift(nuevoIngreso);
+      try {
+        if (isLocalStorageMode) {
+          state.transacciones.unshift({ id: generateUniqueId(), ...nuevoIngreso });
+        } else {
+          const saved = await apiAddTransaccion(nuevoIngreso);
+          if (saved) state.transacciones.unshift(saved);
+        }
+      } catch (err) {
+        showToast("Error de conexión", "No se pudo registrar el cobro. Intenta de nuevo.", "error");
+        return;
+      }
+
       document.getElementById("modal-cobrar-trabajo").classList.remove("active");
-      saveState();
+      saveState(); // persiste el cambio del trabajo (blob); la transacción ya se guardó arriba
     });
   }
 }

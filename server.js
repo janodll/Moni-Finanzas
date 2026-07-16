@@ -5,6 +5,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
+import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
 
 const stateMutex = new Mutex();
 
@@ -137,9 +138,12 @@ function saveLocalDataSync(newData) {
     console.error("Error al rotar copias de seguridad de datos.json:", backupErr);
   }
 
+  const toSave = { ...newData };
+  delete toSave.transacciones; // las transacciones viven en la tabla, no en el blob
+
   const tmpFile = DATA_FILE + '.tmp';
   try {
-    fs.writeFileSync(tmpFile, JSON.stringify(newData, null, 2), 'utf8');
+    fs.writeFileSync(tmpFile, JSON.stringify(toSave, null, 2), 'utf8');
     fs.renameSync(tmpFile, DATA_FILE);
     return true;
   } catch (err) {
@@ -154,6 +158,8 @@ async function uploadToSupabase(data) {
   if (!data.updated_at) {
     data.updated_at = new Date().toISOString();
   }
+  const toSave = { ...data };
+  delete toSave.transacciones; // las transacciones viven en la tabla, no en el blob
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state`, {
       method: 'POST',
@@ -165,8 +171,8 @@ async function uploadToSupabase(data) {
       },
       body: JSON.stringify({
         id: 1,
-        data: data,
-        updated_at: data.updated_at
+        data: toSave,
+        updated_at: toSave.updated_at
       })
     });
     if (!response.ok) {
@@ -202,6 +208,8 @@ async function getLatestState() {
     console.error("Error al leer datos.json local en getLatestState:", err);
   }
 
+  let state = localData;
+
   if (SUPABASE_URL && SUPABASE_KEY) {
     try {
       const response = await fetch(`${SUPABASE_URL}/rest/v1/moni_state?select=data,updated_at&id=eq.1`, {
@@ -221,16 +229,16 @@ async function getLatestState() {
 
           if (localTime > cloudTime && localData) {
             await uploadToSupabase(localData);
-            return localData;
-          } 
-          if (cloudTime > localTime) {
+            state = localData;
+          } else if (cloudTime > localTime) {
             if (!cloudData.updated_at) {
               cloudData.updated_at = cloudUpdatedAt;
             }
             saveLocalDataSync(cloudData);
-            return cloudData;
+            state = cloudData;
+          } else {
+            state = cloudData;
           }
-          return cloudData;
         }
       }
     } catch (dbErr) {
@@ -239,7 +247,12 @@ async function getLatestState() {
     }
   }
 
-  return localData;
+  // Une el blob (config/pendientes/etc.) con las transacciones reales de la tabla.
+  if (state) {
+    try { state.transacciones = await dbGetTransacciones(); }
+    catch (e) { console.error('[db] No se pudo leer transacciones de la tabla:', e.message); state.transacciones = state.transacciones || []; }
+  }
+  return state;
 }
 
 // Envía un mensaje de Telegram en formato Markdown al chat del usuario y retorna el mensaje enviado (o null)
@@ -369,17 +382,7 @@ function addOneMonth(dateStr) {
 }
 
 // Ejecuta la modificación correspondiente sobre el estado en el backend (duplica lógica de cliente)
-function executeActionOnState(actionType, data, state) {
-  const generateUniqueId = () => {
-    const allIds = [
-      ...(state.transacciones || []).map(t => t.id || 0),
-      ...(state.recordatorios || []).map(r => r.id || 0),
-      ...(state.metas || []).map(m => m.id || 0),
-      ...(state.trabajos_pendientes || []).map(j => j.id || 0)
-    ];
-    return Math.max(...allIds, 0) + 1;
-  };
-
+async function executeActionOnState(actionType, data, state) {
   if (actionType === 'transaction') {
     let cuentaId = data.cuenta_id ? parseInt(data.cuenta_id) : null;
     let tarjetaId = data.tarjeta_id ? parseInt(data.tarjeta_id) : null;
@@ -389,7 +392,6 @@ function executeActionOnState(actionType, data, state) {
     }
 
     const nuevaTx = {
-      id: generateUniqueId(),
       fecha: data.fecha || new Date().toISOString().substring(0, 10),
       tipo: data.tipo || "GASTO",
       categoria: data.categoria || "Otros",
@@ -402,8 +404,7 @@ function executeActionOnState(actionType, data, state) {
       nro_operacion: data.nro_operacion || null
     };
 
-    state.transacciones = state.transacciones || [];
-    state.transacciones.unshift(nuevaTx);
+    await dbInsert(nuevaTx);
   }
   else if (actionType === 'transfer') {
     const monto = parseFloat(data.monto);
@@ -415,10 +416,7 @@ function executeActionOnState(actionType, data, state) {
     const cOrigNombre = (state.cuentas || []).find(c => c.id === cOrig)?.nombre || "Origen";
     const cDestNombre = (state.cuentas || []).find(c => c.id === cDest)?.nombre || "Destino";
 
-    const gastoId = generateUniqueId();
-
     const txGasto = {
-      id: gastoId,
       fecha: fecha,
       tipo: "GASTO",
       categoria: "Transferencia",
@@ -426,14 +424,10 @@ function executeActionOnState(actionType, data, state) {
       monto: monto,
       cuenta_id: cOrig,
       tarjeta_id: null,
-      fijo: "Variable",
-      transfer_id: gastoId
+      fijo: "Variable"
     };
-    state.transacciones = state.transacciones || [];
-    state.transacciones.unshift(txGasto);
 
     const txIngreso = {
-      id: generateUniqueId(),
       fecha: fecha,
       tipo: "INGRESO",
       categoria: "Transferencia",
@@ -441,10 +435,10 @@ function executeActionOnState(actionType, data, state) {
       monto: monto,
       cuenta_id: cDest,
       tarjeta_id: null,
-      fijo: "Variable",
-      transfer_id: gastoId
+      fijo: "Variable"
     };
-    state.transacciones.unshift(txIngreso);
+
+    await dbInsertPair(txGasto, txIngreso);
   }
   else if (actionType === 'pay_reminder') {
     const remId = parseInt(data.reminder_id);
@@ -468,7 +462,6 @@ function executeActionOnState(actionType, data, state) {
     }
 
     const tx = {
-      id: generateUniqueId(),
       fecha: new Date().toISOString().substring(0, 10),
       tipo: esTarjeta ? "INGRESO" : "GASTO",
       categoria: esTarjeta ? "Pago Tarjeta" : "Servicios",
@@ -479,10 +472,8 @@ function executeActionOnState(actionType, data, state) {
       fijo: esTarjeta ? "Variable" : "Fijo"
     };
 
-    state.transacciones = state.transacciones || [];
     if (esTarjeta) {
       const txEspejo = {
-        id: generateUniqueId(),
         fecha: tx.fecha,
         tipo: "GASTO",
         categoria: "Pago Tarjeta",
@@ -492,10 +483,12 @@ function executeActionOnState(actionType, data, state) {
         tarjeta_id: null,
         fijo: "Variable"
       };
-      state.transacciones.unshift(txEspejo);
+      // Enlazadas por transfer_id (igual que el par que crea el modal web): permite
+      // borrar/deshacer ambas piernas juntas en vez de dejar una huérfana.
+      await dbInsertPair(txEspejo, tx);
+    } else {
+      await dbInsert(tx);
     }
-
-    state.transacciones.unshift(tx);
   }
   else if (actionType === 'collect_job') {
     const jobId = parseInt(data.job_id);
@@ -511,7 +504,6 @@ function executeActionOnState(actionType, data, state) {
     job.cuenta_id = ctaId;
 
     const tx = {
-      id: generateUniqueId(),
       fecha: fecha,
       tipo: "INGRESO",
       categoria: "Sueldo",
@@ -522,8 +514,7 @@ function executeActionOnState(actionType, data, state) {
       fijo: "Variable"
     };
 
-    state.transacciones = state.transacciones || [];
-    state.transacciones.unshift(tx);
+    await dbInsert(tx);
   }
   else if (actionType === 'savings_contribution') {
     const metaId = parseInt(data.meta_id);
@@ -541,7 +532,6 @@ function executeActionOnState(actionType, data, state) {
     }
 
     const tx = {
-      id: generateUniqueId(),
       fecha: new Date().toISOString().substring(0, 10),
       tipo: operacion === "APORTE" ? "GASTO" : "INGRESO",
       categoria: "Ahorro",
@@ -552,12 +542,11 @@ function executeActionOnState(actionType, data, state) {
       fijo: "Variable"
     };
 
-    state.transacciones = state.transacciones || [];
-    state.transacciones.unshift(tx);
+    await dbInsert(tx);
   }
   else if (actionType === 'batch') {
     for (const txData of data.transacciones || []) {
-      executeActionOnState('transaction', txData, state);
+      await executeActionOnState('transaction', txData, state);
     }
   }
 }
@@ -640,7 +629,7 @@ async function handleTelegramDirectCommand(text, state, chatId) {
       await sendTelegramMessage(chatId, parsedReply.response);
     } else if (parsedReply.type === 'action') {
       try {
-        executeActionOnState(parsedReply.actionType, parsedReply.data, state);
+        await executeActionOnState(parsedReply.actionType, parsedReply.data, state);
         state.updated_at = new Date().toISOString();
         
         if (SUPABASE_URL && SUPABASE_KEY) {
@@ -862,20 +851,13 @@ async function handleAutoRegister(req, res) {
 
   // Si ya tiene categoría y descripción final estructurada
   if (categoria && descripcion) {
-    newTx.id = Math.max(...(state.transacciones || []).map(t => t.id || 0), 0) + 1;
     newTx.categoria = categoria;
     newTx.descripcion = descripcion;
-    
-    state.transacciones = state.transacciones || [];
-    state.transacciones.unshift(newTx);
-    state.updated_at = new Date().toISOString();
-    
-    if (SUPABASE_URL && SUPABASE_KEY) {
-      await uploadToSupabase(state);
-    }
-    saveLocalDataSync(state);
-    
-    return res.json({ ok: true, registered: true, data: newTx });
+
+    const saved = await dbInsert(newTx);
+    if (!saved) return res.json({ ok: true, duplicate: true });
+
+    return res.json({ ok: true, registered: true, data: saved });
   } else {
     // Enviar mensaje a Telegram primero para obtener su message_id
     const chatMsg = `🔔 *Gasto Detectado* (${banco_o_metodo})\nMonto: *${newTx.moneda} ${newTx.monto.toFixed(2)}*\nDetalle: _${newTx.descripcion_original}_\n\n¿En qué gastaste? Responde con el detalle (ej: "almuerzo", "taxi", "frutas").`;
@@ -911,6 +893,33 @@ app.get('/api/data', requireLocalAuth, async (req, res) => {
   } else {
     res.status(500).json({ error: "No se pudo leer la base de datos." });
   }
+});
+
+// Crear una transacción
+app.post('/api/transaccion', requireLocalAuth, async (req, res) => {
+  try { const saved = await dbInsert(req.body); res.json({ ok: true, duplicate: !saved, data: saved }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Crear un par (transferencia / pago de tarjeta)
+app.post('/api/transaccion/par', requireLocalAuth, async (req, res) => {
+  try { const r = await dbInsertPair(req.body.gasto, req.body.ingreso); res.json({ ok: true, data: r }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Editar
+app.put('/api/transaccion/:id', requireLocalAuth, async (req, res) => {
+  try { const row = await dbUpdate(req.params.id, req.body); res.json({ ok: true, data: row }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Borrar (si tiene transfer_id, borra ambas piernas)
+app.delete('/api/transaccion/:id', requireLocalAuth, async (req, res) => {
+  try {
+    const transferId = req.query.transfer_id;
+    if (transferId) await dbDeleteByTransfer(transferId); else await dbDelete(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Endpoint para registro automático (desde correos)
@@ -1202,14 +1211,14 @@ No devuelvas nada más que el JSON limpio.
             return res.sendStatus(200);
           }
 
-          pendingTx.id = Math.max(...(state.transacciones || []).map(t => t.id || 0), 0) + 1;
           pendingTx.categoria = parsed.categoria || "Otros";
           pendingTx.descripcion = parsed.descripcion || text;
 
           // Remover la transacción del índice correspondiente (evita pop() ciego)
           state.transacciones_pendientes.splice(pendingTxIndex, 1);
-          state.transacciones = state.transacciones || [];
-          state.transacciones.unshift(pendingTx);
+          // El insert real a la tabla se hace al final, una vez resueltas todas las
+          // mutaciones de abajo (pago de tarjeta / transferencia automática pueden
+          // cambiar categoria/tipo/tarjeta_id/descripcion de pendingTx).
 
           // NUEVO: Pagar recordatorio automáticamente si la IA lo detectó
           let reminderMsgAddon = "";
@@ -1233,8 +1242,7 @@ No devuelvas nada más que el JSON limpio.
                  pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta otra tarjeta
                  const tarjetaPagadaId = rem.tarjeta_id ? parseInt(rem.tarjeta_id) : null;
                  if (tarjetaPagadaId) {
-                   state.transacciones.unshift({
-                     id: pendingTx.id + 1,
+                   await dbInsert({
                      fecha: pendingTx.fecha,
                      tipo: "INGRESO",
                      categoria: "Pago Tarjeta",
@@ -1276,8 +1284,7 @@ No devuelvas nada más que el JSON limpio.
                 );
                 
                 if (targetAccount) {
-                  const txEspejo = {
-                    id: pendingTx.id + 1,
+                  await dbInsert({
                     fecha: pendingTx.fecha,
                     tipo: "INGRESO",
                     categoria: "Transferencia",
@@ -1287,14 +1294,15 @@ No devuelvas nada más que el JSON limpio.
                     cuenta_id: targetAccount.id,
                     tarjeta_id: null,
                     fijo: "Variable"
-                  };
-                  state.transacciones.unshift(txEspejo);
+                  });
                   pendingTx.descripcion = `Transferencia enviada a ${targetName}`;
                   console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
                 }
               }
             }
           }
+
+          await dbInsert(pendingTx);
           state.updated_at = new Date().toISOString();
 
           if (SUPABASE_URL && SUPABASE_KEY) {
@@ -1332,6 +1340,8 @@ app.post('/api/data', requireLocalAuth, async (req, res) => {
   if (!newData || typeof newData !== 'object') {
     return res.status(400).json({ error: "Datos inválidos." });
   }
+
+  delete newData.transacciones; // se guardan por sus propios endpoints; ignorar si llegan en el body
 
   // Estampar la fecha de actualización directamente en el JSON
   newData.updated_at = new Date().toISOString();
