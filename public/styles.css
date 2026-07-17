@@ -973,6 +973,8 @@ body {
   outline: none;
   background-color: #FFFFFF;
   transition: var(--transition-fast);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-control:focus {
@@ -1150,6 +1152,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .form-group label {

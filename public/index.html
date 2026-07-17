@@ -781,12 +781,12 @@
         <div class="form-row grid-2">
           <div class="form-group">
             <label for="tx-monto">Monto</label>
-            <div style="display:flex; gap:6px;">
-              <select id="tx-moneda" class="form-control" style="max-width:84px; flex-shrink:0;" title="Moneda">
+            <div style="display:flex; gap:6px; width:100%;">
+              <select id="tx-moneda" class="form-control" style="width:75px; flex-shrink:0; padding-left:8px; padding-right:8px;" title="Moneda">
                 <option value="S/.">S/.</option>
                 <option value="US$">US$</option>
               </select>
-              <input type="number" id="tx-monto" step="0.01" min="0.01" class="form-control" placeholder="Ej. 45.50" required>
+              <input type="number" id="tx-monto" step="0.01" min="0.01" class="form-control" style="flex:1; min-width:0;" placeholder="Ej. 45.50" required>
             </div>
           </div>
           <div class="form-group">
