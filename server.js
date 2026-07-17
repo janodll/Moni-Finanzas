@@ -1091,17 +1091,35 @@ app.post('/api/telegram-webhook', async (req, res) => {
       normalizedText.includes('test');
 
     if (isCancelWord) {
-      if (state.transacciones_pendientes.length > 0) {
-        const discarded = state.transacciones_pendientes.pop();
-        state.updated_at = new Date().toISOString();
-        if (SUPABASE_URL && SUPABASE_KEY) {
-          await uploadToSupabase(state);
-        }
-        saveLocalDataSync(state);
-        await sendTelegramMessage(chatId, `❌ Transacción descartada: *${discarded.moneda} ${discarded.monto}* a _${discarded.descripcion_original}_.`);
-      } else {
+      if (state.transacciones_pendientes.length === 0) {
         await sendTelegramMessage(chatId, "No tienes transacciones pendientes.");
+        return res.sendStatus(200);
       }
+      // Elegir cuál cancelar respetando el Reply (misma lógica que la categorización):
+      // por message_id, o por el monto citado en el texto del aviso respondido.
+      let idx = state.transacciones_pendientes.length - 1;
+      let matched = false;
+      if (message.reply_to_message) {
+        const replyMsgId = message.reply_to_message.message_id;
+        let mi = state.transacciones_pendientes.findIndex(t => t.telegram_message_id === replyMsgId);
+        if (mi === -1 && message.reply_to_message.text) {
+          const m = message.reply_to_message.text.match(/Monto:[^\d]*(\d+(?:[.,]\d+)?)/i);
+          if (m) { const mc = parseFloat(m[1].replace(',', '.')); mi = state.transacciones_pendientes.findIndex(t => Number(t.monto) === mc); }
+        }
+        if (mi !== -1) { idx = mi; matched = true; }
+      }
+      // Fail-safe: con varios pendientes y sin poder emparejar el Reply, no cancelar a ciegas el último.
+      if (!matched && state.transacciones_pendientes.length > 1) {
+        await sendTelegramMessage(chatId, `⚠️ Tienes ${state.transacciones_pendientes.length} gastos pendientes. Para cancelar el correcto, *responde (Reply)* al mensaje de ese gasto y escribe "cancelar".`);
+        return res.sendStatus(200);
+      }
+      const discarded = state.transacciones_pendientes.splice(idx, 1)[0];
+      state.updated_at = new Date().toISOString();
+      if (SUPABASE_URL && SUPABASE_KEY) {
+        await uploadToSupabase(state);
+      }
+      saveLocalDataSync(state);
+      await sendTelegramMessage(chatId, `❌ Transacción descartada: *${discarded.moneda} ${discarded.monto}* a _${discarded.descripcion_original}_.`);
       return res.sendStatus(200);
     }
 
@@ -1302,7 +1320,7 @@ No devuelvas nada más que el JSON limpio.
             }
           }
 
-          await dbInsert(pendingTx);
+          const savedTx = await dbInsert(pendingTx);
           state.updated_at = new Date().toISOString();
 
           if (SUPABASE_URL && SUPABASE_KEY) {
@@ -1310,7 +1328,11 @@ No devuelvas nada más que el JSON limpio.
           }
           saveLocalDataSync(state);
 
-          await sendTelegramMessage(chatId, `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto.toFixed(2)}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_${reminderMsgAddon}`);
+          if (savedTx) {
+            await sendTelegramMessage(chatId, `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto.toFixed(2)}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_${reminderMsgAddon}`);
+          } else {
+            await sendTelegramMessage(chatId, `♻️ Ese gasto ya estaba registrado (duplicado, ignorado). No se creó por segunda vez.`);
+          }
         } else {
           const errText = await response.text();
           console.error("[Telegram-Webhook] Gemini API devolvió error:", response.status, errText);
