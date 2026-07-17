@@ -961,6 +961,16 @@ body {
   gap: 12px;
   flex-grow: 1;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-search-group #tx-search {
+  flex: 1;
+  min-width: 180px;
+}
+
+.filter-search-group .form-control {
+  width: auto;
 }
 
 .form-control {
@@ -973,8 +983,11 @@ body {
   outline: none;
   background-color: #FFFFFF;
   transition: var(--transition-fast);
-  width: 100%;
   box-sizing: border-box;
+}
+
+.form-group .form-control {
+  width: 100%;
 }
 
 .form-control:focus {
