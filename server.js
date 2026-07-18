@@ -558,10 +558,11 @@ async function executeActionOnState(actionType, data, state) {
 // si tardas). Devuelve el Response del primer modelo que responde (ok o error que no es
 // saturación), o el último Response si todos siguen saturados.
 async function geminiGenerateContent(apiKey, body, label = 'Gemini') {
-  // gemini-flash-latest = flash GA actual; gemini-3.1-flash-lite = modelo ligero
-  // vivo, con más capacidad, como alternativa cuando el flash principal se satura (503).
+  // Se usa PRIMERO el modelo barato (flash-lite, ~1/3 del costo) porque las tareas
+  // son simples (extraer JSON / categorizar) y no necesitan el flash grande. flash-latest
+  // queda de respaldo si el lite se satura (503/429).
   // (No usar gemini-2.5-flash: descontinuado por Google en jul-2026.)
-  const modelsToTry = ['gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
   let response;
   for (const modelName of modelsToTry) {
