@@ -15,20 +15,13 @@
 - **Repo:** github.com/janodll/Moni-Finanzas — rama `main` — **push a main = auto-deploy en Render**.
 - **Trabajo en curso:** se está estabilizando el sistema (bugs de raíz) y se migró la arquitectura de datos. La pieza grande (migración de transacciones a tabla relacional) YA se hizo.
 
-**Modo de trabajo (orquestador + subagentes):** el agente del chat actúa como **CABEZA / orquestador**. NO hace el trabajo pesado inline; lo **delega a subagentes** para mantener el chat principal liviano de contexto:
-- Investigar/buscar en el código → subagente de exploración (read-only).
-- Implementar cambios acotados → subagente de implementación.
-- Revisar código/diffs → subagente revisor.
-- Correr pruebas/verificaciones → subagente.
-En el chat principal quedan solo: planificar, decidir y dar resúmenes concisos al usuario.
+**Restricciones prácticas (para quien trabaje el código):**
+- **Verificar en el código real antes de afirmar** (búsqueda/lectura, no de memoria).
+- **Push a `main` = auto-deploy en Render.** Commitear/pushear solo cuando corresponda.
+- La **UI de Moni** y el **dashboard de Supabase** los maneja **Jano** (el agente no tiene acceso a ninguno).
+- Los **lectores de Apps Script** (`lector_jano.js`, `lector_andrea.js`) el agente los edita localmente y **Jano los pega a mano** en script.google.com (**dos proyectos separados**). Render NO los despliega.
 
-Reglas para orquestar bien:
-- Cada subagente arranca EN FRÍO: darle un brief autocontenido (que lea este `ESTADO.md` + los archivos/contexto específicos que necesita).
-- Tareas bien acotadas; NO correr subagentes en paralelo que editen el mismo archivo (se pisan). Para paralelo, aislar por archivo/worktree.
-- **Verificar** el resultado del subagente antes de reportar algo como hecho/desplegado (no fiarse ciego).
-- Verificar en el código real antes de afirmar, no de memoria.
-
-Lo que hace **Jano** (no los subagentes): pasos en la UI de Moni y en el dashboard de Supabase (el agente no tiene acceso a ninguno); y **pegar a mano** los lectores de Apps Script en script.google.com (**dos proyectos separados** — el agente edita los `.js` locales, Jano los pega). Recordar: **push a `main` = auto-deploy en Render**.
+> El **modo de trabajo** (agente cabeza que orquesta con subagentes) está en el **prompt inicial** de la sesión, no aquí — así no se grava a cada subagente que lee este archivo.
 
 ---
 
