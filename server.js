@@ -1286,35 +1286,37 @@ No devuelvas nada más que el JSON limpio.
           
           if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id) {
             const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
-            
-            if (sourceAccount) {
-              const isSourceAndrea = sourceAccount.titular === "Andrea";
-              let targetName = null;
-              
-              if ((descNorm.includes("jano") || descNorm.includes("a jano")) && isSourceAndrea) {
-                targetName = "Jano";
-              } else if ((descNorm.includes("andrea") || descNorm.includes("a andrea")) && !isSourceAndrea) {
-                targetName = "Andrea";
-              }
 
-              if (targetName) {
-                const targetAccount = (state.cuentas || []).find(c => 
-                  c.titular === targetName && c.banco === sourceAccount.banco
-                );
-                
+            if (sourceAccount) {
+              // Se identifica origen/destino por el NOMBRE de la cuenta (contiene "Jano"/"Andrea"),
+              // no por titular (que es "Yo"/"Esposa"). El banco se deduce del primer token del nombre.
+              const srcName = normalizeString(sourceAccount.nombre);   // ej. "bcp andrea"
+              const srcBanco = srcName.split(' ')[0];                  // ej. "bcp"
+              let targetPerson = null;
+              if (descNorm.includes("jano") && !srcName.includes("jano")) targetPerson = "jano";
+              else if (descNorm.includes("andrea") && !srcName.includes("andrea")) targetPerson = "andrea";
+
+              if (targetPerson) {
+                const targetAccount = (state.cuentas || []).find(c => {
+                  const n = normalizeString(c.nombre);
+                  return n.includes(targetPerson) && n.split(' ')[0] === srcBanco;
+                });
+
                 if (targetAccount) {
+                  const fromPerson = srcName.includes("andrea") ? "Andrea" : "Jano";
+                  const toPerson = targetPerson.charAt(0).toUpperCase() + targetPerson.slice(1);
                   await dbInsert({
                     fecha: pendingTx.fecha,
                     tipo: "INGRESO",
                     categoria: "Transferencia",
-                    descripcion: `Transferencia recibida de ${isSourceAndrea ? "Andrea" : "Jano"}`,
+                    descripcion: `Transferencia recibida de ${fromPerson}`,
                     monto: pendingTx.monto,
                     moneda: pendingTx.moneda,
                     cuenta_id: targetAccount.id,
                     tarjeta_id: null,
                     fijo: "Variable"
                   });
-                  pendingTx.descripcion = `Transferencia enviada a ${targetName}`;
+                  pendingTx.descripcion = `Transferencia enviada a ${toPerson}`;
                   console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
                 }
               }
