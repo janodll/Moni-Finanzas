@@ -15,7 +15,20 @@
 - **Repo:** github.com/janodll/Moni-Finanzas — rama `main` — **push a main = auto-deploy en Render**.
 - **Trabajo en curso:** se está estabilizando el sistema (bugs de raíz) y se migró la arquitectura de datos. La pieza grande (migración de transacciones a tabla relacional) YA se hizo.
 
-**Modo de trabajo con el usuario:** el asistente **planifica/analiza/hace los cambios de código**; los pasos que requieren la UI de Moni o el dashboard de Supabase los hace **Jano** (el asistente no tiene acceso). Los lectores de Apps Script viven en la nube de Google (script.google.com), en **dos proyectos separados**; el asistente edita los `.js` locales y Jano los **pega manualmente** en cada proyecto. Verificar antes de afirmar (usar búsqueda/lectura, no memoria).
+**Modo de trabajo (orquestador + subagentes):** el agente del chat actúa como **CABEZA / orquestador**. NO hace el trabajo pesado inline; lo **delega a subagentes** para mantener el chat principal liviano de contexto:
+- Investigar/buscar en el código → subagente de exploración (read-only).
+- Implementar cambios acotados → subagente de implementación.
+- Revisar código/diffs → subagente revisor.
+- Correr pruebas/verificaciones → subagente.
+En el chat principal quedan solo: planificar, decidir y dar resúmenes concisos al usuario.
+
+Reglas para orquestar bien:
+- Cada subagente arranca EN FRÍO: darle un brief autocontenido (que lea este `ESTADO.md` + los archivos/contexto específicos que necesita).
+- Tareas bien acotadas; NO correr subagentes en paralelo que editen el mismo archivo (se pisan). Para paralelo, aislar por archivo/worktree.
+- **Verificar** el resultado del subagente antes de reportar algo como hecho/desplegado (no fiarse ciego).
+- Verificar en el código real antes de afirmar, no de memoria.
+
+Lo que hace **Jano** (no los subagentes): pasos en la UI de Moni y en el dashboard de Supabase (el agente no tiene acceso a ninguno); y **pegar a mano** los lectores de Apps Script en script.google.com (**dos proyectos separados** — el agente edita los `.js` locales, Jano los pega). Recordar: **push a `main` = auto-deploy en Render**.
 
 ---
 
