@@ -336,6 +336,10 @@ function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
       const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('interbank') && personOk(t.nombre.toLowerCase()));
       if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
     }
+    if (query.includes('cencosud')) {
+      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('cencosud') && personOk(t.nombre.toLowerCase()));
+      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
+    }
   } else {
     // Buscar en cuentas (débito)
     for (const c of state.cuentas || []) {
@@ -831,7 +835,7 @@ async function handleAutoRegister(req, res) {
     return res.json({ ok: true, message: "Transacción duplicada por similitud ignorada.", duplicate: true });
   }
 
-  const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank'].some(keyword => 
+  const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud'].some(keyword =>
     banco_o_metodo.toLowerCase().includes(keyword)
   );
   const { cuenta_id, tarjeta_id } = resolveAccountOrCard(banco_o_metodo, isCreditCard, state);
