@@ -1296,33 +1296,48 @@ No devuelvas nada más que el JSON limpio.
               // El banco se deduce del primer token del nombre.
               const srcName = normalizeString(sourceAccount.nombre);   // ej. "bcp andrea"
               const srcBanco = srcName.split(' ')[0];                  // ej. "bcp"
+              const srcPerson = srcName.includes("andrea") ? "andrea" : "jano";
+
               let targetPerson = null;
               if (descNorm.includes("jano") && !srcName.includes("jano")) targetPerson = "jano";
               else if (descNorm.includes("andrea") && !srcName.includes("andrea")) targetPerson = "andrea";
 
+              let targetAccount = null;
+              let samePerson = false;
               if (targetPerson) {
-                const targetAccount = (state.cuentas || []).find(c => {
+                // Transferencia a la cuenta de la OTRA persona (posible mismo banco o distinto).
+                targetAccount = (state.cuentas || []).find(c => {
                   const n = normalizeString(c.nombre);
                   return n.includes(targetPerson) && n.split(' ')[0] === srcBanco;
                 });
+              } else {
+                // Transferencia entre dos cuentas de la MISMA persona en OTRO banco
+                // (ej. de "BCP Andrea" a "BBVA Andrea": la descripción nombra el banco
+                // destino, no a otra persona, porque la dueña de ambas cuentas es la misma).
+                targetAccount = (state.cuentas || []).find(c => {
+                  const n = normalizeString(c.nombre);
+                  const banco = n.split(' ')[0];
+                  return banco !== srcBanco && descNorm.includes(banco) && n.includes(srcPerson);
+                });
+                if (targetAccount) { targetPerson = srcPerson; samePerson = true; }
+              }
 
-                if (targetAccount) {
-                  const fromPerson = srcName.includes("andrea") ? "Andrea" : "Jano";
-                  const toPerson = targetPerson.charAt(0).toUpperCase() + targetPerson.slice(1);
-                  await dbInsert({
-                    fecha: pendingTx.fecha,
-                    tipo: "INGRESO",
-                    categoria: "Transferencia",
-                    descripcion: `Transferencia recibida de ${fromPerson}`,
-                    monto: pendingTx.monto,
-                    moneda: pendingTx.moneda,
-                    cuenta_id: targetAccount.id,
-                    tarjeta_id: null,
-                    fijo: "Variable"
-                  });
-                  pendingTx.descripcion = `Transferencia enviada a ${toPerson}`;
-                  console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
-                }
+              if (targetAccount) {
+                const fromPerson = srcPerson.charAt(0).toUpperCase() + srcPerson.slice(1);
+                const toPerson = targetPerson.charAt(0).toUpperCase() + targetPerson.slice(1);
+                await dbInsert({
+                  fecha: pendingTx.fecha,
+                  tipo: "INGRESO",
+                  categoria: "Transferencia",
+                  descripcion: samePerson ? `Transferencia desde mi cuenta ${sourceAccount.nombre}` : `Transferencia recibida de ${fromPerson}`,
+                  monto: pendingTx.monto,
+                  moneda: pendingTx.moneda,
+                  cuenta_id: targetAccount.id,
+                  tarjeta_id: null,
+                  fijo: "Variable"
+                });
+                pendingTx.descripcion = samePerson ? `Transferencia a mi cuenta ${targetAccount.nombre}` : `Transferencia enviada a ${toPerson}`;
+                console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
               }
             }
           }
