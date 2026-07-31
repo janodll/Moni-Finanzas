@@ -235,7 +235,7 @@ export async function fetchData() {
 export function getCleanDefaultState() {
   return {
     cuentas: [
-      { id: 1, nombre: "Efectivo", titular: "Yo", tipo: "Debito" }
+      { id: 1, nombre: "Efectivo", titular: "Jano", tipo: "Debito" }
     ],
     tarjetas: [],
     transacciones: [],

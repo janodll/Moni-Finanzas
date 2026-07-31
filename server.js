@@ -352,25 +352,25 @@ function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
     // Fallbacks específicos de débito/billeteras
     if (query.includes('yape')) {
       const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const titular = isAndrea ? 'Andrea' : 'Jano';
       const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
       if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
     }
     if (query.includes('plin')) {
       const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const titular = isAndrea ? 'Andrea' : 'Jano';
       const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
       if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
     }
     if (query.includes('bcp')) {
       const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const titular = isAndrea ? 'Andrea' : 'Jano';
       const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
       if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
     }
     if (query.includes('interbank')) {
       const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Yo';
+      const titular = isAndrea ? 'Andrea' : 'Jano';
       const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
       if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
     }
@@ -1292,8 +1292,8 @@ No devuelvas nada más que el JSON limpio.
             const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
 
             if (sourceAccount) {
-              // Se identifica origen/destino por el NOMBRE de la cuenta (contiene "Jano"/"Andrea"),
-              // no por titular (que es "Yo"/"Esposa"). El banco se deduce del primer token del nombre.
+              // Se identifica origen/destino por el NOMBRE de la cuenta (contiene "Jano"/"Andrea").
+              // El banco se deduce del primer token del nombre.
               const srcName = normalizeString(sourceAccount.nombre);   // ej. "bcp andrea"
               const srcBanco = srcName.split(' ')[0];                  // ej. "bcp"
               let targetPerson = null;
