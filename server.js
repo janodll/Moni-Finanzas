@@ -378,6 +378,45 @@ function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
   return { cuenta_id: null, tarjeta_id: null };
 }
 
+// Busca en state.tarjetas la única tarjeta nombrada dentro de un texto libre.
+// Mismo enfoque que el bloque [Transferencia Automática]: se normaliza el texto (minúsculas,
+// sin tildes) y se compara contra los tokens del nombre de la tarjeta (el banco/emisor),
+// descartando las palabras genéricas ("tarjeta") y los nombres de persona.
+// Devuelve null si hay 0 candidatas o si quedan varias sin poder desempatar por persona:
+// es preferible no hacer nada a restarle la deuda a la tarjeta equivocada.
+function buscarTarjetaEnTexto(texto, state) {
+  const norm = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const t = norm(texto);
+  if (!t.trim()) return null;
+
+  // Si el texto nombra a las DOS personas no se puede desempatar: se trata como sin persona.
+  const nombraJano = t.includes("jano");
+  const nombraAndrea = t.includes("andrea");
+  const persona = (nombraJano && nombraAndrea) ? null : (nombraAndrea ? "andrea" : (nombraJano ? "jano" : null));
+
+  const candidatas = (state.tarjetas || []).filter(tj => {
+    const nombre = norm(tj.nombre);
+    // Tokens que identifican al emisor: "cmr", "falabella", "interbank", "bbva", "cencosud"...
+    const tokens = nombre.split(' ').filter(w => w.length >= 3 && w !== 'tarjeta' && w !== 'jano' && w !== 'andrea');
+    if (tokens.length === 0) return false;
+    if (!tokens.some(w => t.includes(w))) return false;
+    // Si el nombre de la tarjeta es de una persona, el texto no puede nombrar a la otra.
+    if (persona === 'andrea' && nombre.includes('jano')) return false;
+    if (persona === 'jano' && nombre.includes('andrea')) return false;
+    return true;
+  });
+
+  if (candidatas.length === 1) return candidatas[0];
+
+  // Varias del mismo banco (ej. "Interbank Jano" vs "Interbank Andrea"): solo se resuelve
+  // si el texto nombra explícitamente a una de las dos personas.
+  if (candidatas.length > 1 && persona) {
+    const dePersona = candidatas.filter(tj => norm(tj.nombre).includes(persona));
+    if (dePersona.length === 1) return dePersona[0];
+  }
+  return null;
+}
+
 // Suma un mes a un string de fecha YYYY-MM-DD
 function addOneMonth(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -1237,6 +1276,23 @@ No devuelvas nada más que el JSON limpio.
           pendingTx.categoria = parsed.categoria || "Otros";
           pendingTx.descripcion = parsed.descripcion || text;
 
+          // La cuenta/tarjeta se resolvió al llegar el correo (handleAutoRegister). Si en ese
+          // momento la cuenta todavía no existía en el estado, quedó en null para siempre y la
+          // transacción resulta invisible para saldos y deudas. Se reintenta acá, ahora que el
+          // estado puede tener cuentas nuevas, y SOLO si ambos ids siguen nulos (para no pisar
+          // una asignación que ya se hizo bien).
+          if (!pendingTx.cuenta_id && !pendingTx.tarjeta_id && pendingTx.banco_o_metodo) {
+            const esTarjetaCredito = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud'].some(keyword =>
+              pendingTx.banco_o_metodo.toLowerCase().includes(keyword)
+            );
+            const reResuelto = resolveAccountOrCard(pendingTx.banco_o_metodo, esTarjetaCredito, state);
+            if (reResuelto.cuenta_id || reResuelto.tarjeta_id) {
+              pendingTx.cuenta_id = reResuelto.cuenta_id;
+              pendingTx.tarjeta_id = reResuelto.tarjeta_id;
+              console.log(`[Telegram-Webhook] Cuenta/tarjeta re-resuelta al categorizar (${pendingTx.banco_o_metodo}): cuenta_id=${reResuelto.cuenta_id}, tarjeta_id=${reResuelto.tarjeta_id}`);
+            }
+          }
+
           // Remover la transacción del índice correspondiente (evita pop() ciego)
           state.transacciones_pendientes.splice(pendingTxIndex, 1);
           // El insert real a la tabla se hace al final, una vez resueltas todas las
@@ -1245,6 +1301,10 @@ No devuelvas nada más que el JSON limpio.
 
           // NUEVO: Pagar recordatorio automáticamente si la IA lo detectó
           let reminderMsgAddon = "";
+          // Pierna INGRESO que reduce la deuda de la tarjeta pagada. Se arma acá y se inserta
+          // UNA sola vez al final (junto al GASTO, con dbInsertPair). Que sea una sola variable
+          // garantiza que el camino del recordatorio y el camino por texto no la dupliquen.
+          let txEspejoTarjeta = null;
           if (parsed.recordatorio_pagado_id && state.recordatorios) {
             const remIdx = state.recordatorios.findIndex(r => parseInt(r.id) === parseInt(parsed.recordatorio_pagado_id));
             if (remIdx >= 0) {
@@ -1263,9 +1323,13 @@ No devuelvas nada más que el JSON limpio.
                  pendingTx.categoria = "Pago Tarjeta";
                  pendingTx.tipo = "GASTO";
                  pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta otra tarjeta
+                 // La tarjeta del recordatorio debe existir de verdad en el estado: hay
+                 // recordatorios viejos que apuntan a tarjetas ya borradas (dato huérfano),
+                 // y un INGRESO a una tarjeta inexistente es invisible en el dashboard.
                  const tarjetaPagadaId = rem.tarjeta_id ? parseInt(rem.tarjeta_id) : null;
-                 if (tarjetaPagadaId) {
-                   await dbInsert({
+                 const tarjetaDelRecordatorio = (state.tarjetas || []).find(t => parseInt(t.id) === tarjetaPagadaId);
+                 if (tarjetaDelRecordatorio) {
+                   txEspejoTarjeta = {
                      fecha: pendingTx.fecha,
                      tipo: "INGRESO",
                      categoria: "Pago Tarjeta",
@@ -1273,12 +1337,14 @@ No devuelvas nada más que el JSON limpio.
                      monto: pendingTx.monto,
                      moneda: pendingTx.moneda,
                      cuenta_id: null,
-                     tarjeta_id: tarjetaPagadaId,
+                     tarjeta_id: tarjetaDelRecordatorio.id,
                      fijo: "Variable"
-                   });
+                   };
+                   reminderMsgAddon = `\n🔔 _Tarjeta "${rem.nombre}" pagada: deuda reducida en ${pendingTx.moneda || 'S/.'} ${pendingTx.monto}._`;
+                   console.log(`[Telegram-Webhook] Pago de tarjeta ${rem.nombre}: INGRESO preparado a tarjeta ${tarjetaDelRecordatorio.id} para reducir deuda.`);
+                 } else {
+                   console.log(`[Telegram-Webhook] Recordatorio "${rem.nombre}" apunta a tarjeta_id ${rem.tarjeta_id}, que no existe en el estado. Se intentará identificar la tarjeta por el texto.`);
                  }
-                 reminderMsgAddon = `\n🔔 _Tarjeta "${rem.nombre}" pagada: deuda reducida en ${pendingTx.moneda || 'S/.'} ${pendingTx.monto}._`;
-                 console.log(`[Telegram-Webhook] Pago de tarjeta ${rem.nombre}: INGRESO creado a tarjeta ${tarjetaPagadaId} para reducir deuda.`);
               }
             }
           }
@@ -1287,7 +1353,57 @@ No devuelvas nada más que el JSON limpio.
           const normalizeString = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const catNorm = normalizeString(pendingTx.categoria);
           const descNorm = normalizeString(pendingTx.descripcion);
-          
+
+          // [Pago Tarjeta] Un pago de tarjeta SIEMPRE debe reducir la deuda de la tarjeta pagada,
+          // haya o no un recordatorio enlazado por la IA. Antes el INGRESO espejo vivía solo
+          // dentro de la rama del recordatorio, así que en la práctica la deuda nunca bajaba.
+          // Si acá ya hay espejo (lo armó el recordatorio), no se toca: no se duplica.
+          //
+          // Se exige pendingTx.cuenta_id (igual que el bloque [Transferencia Automática] de abajo):
+          //   - Sin cuenta de origen, el espejo bajaría la deuda sin que salga plata de ningún lado
+          //     y el balance general subiría por el monto del pago.
+          //   - Además protege el caso de un CONSUMO con tarjeta mal categorizado como "Pago Tarjeta"
+          //     (ese llega con tarjeta_id y sin cuenta_id): sin la guarda se le anularía la tarjeta
+          //     y encima se le restaría deuda, con un error del doble del monto.
+          const esPagoTarjeta = catNorm.includes("pago") && catNorm.includes("tarjeta");
+          if (esPagoTarjeta && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id && !txEspejoTarjeta) {
+            // La tarjeta se deduce SOLO de lo que describe el pago. NO se usa banco_o_metodo como
+            // respaldo: ese es el banco de DÓNDE SALIÓ la plata, no cuál se pagó, y usarlo hace que
+            // pagar la Cencosud desde la cuenta BBVA le baje la deuda a la tarjeta BBVA. Ante la
+            // duda no se adivina: se avisa y el usuario lo corrige a mano.
+            const textoPago = `${pendingTx.descripcion || ''} ${pendingTx.descripcion_original || ''}`;
+            const tarjetaPagada = buscarTarjetaEnTexto(textoPago, state);
+            if (tarjetaPagada) {
+              pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta otra tarjeta
+              // Categoría exacta: el dashboard excluye los pagos de tarjeta de los totales del mes
+              // comparando por igualdad estricta con "Pago Tarjeta".
+              pendingTx.categoria = "Pago Tarjeta";
+              txEspejoTarjeta = {
+                fecha: pendingTx.fecha,
+                tipo: "INGRESO",
+                categoria: "Pago Tarjeta",
+                descripcion: `Pago de Tarjeta ${tarjetaPagada.nombre}`,
+                monto: pendingTx.monto,
+                moneda: pendingTx.moneda,
+                cuenta_id: null,
+                tarjeta_id: tarjetaPagada.id,
+                fijo: "Variable"
+              };
+              reminderMsgAddon += `\n💳 _Deuda de "${tarjetaPagada.nombre}" reducida en ${pendingTx.moneda || 'S/.'} ${pendingTx.monto}._`;
+              console.log(`[Pago Tarjeta] Espejo preparado: INGRESO a tarjeta ${tarjetaPagada.id} (${tarjetaPagada.nombre}) por ${pendingTx.monto}.`);
+            } else {
+              // Fail-safe: adivinar la tarjeta sería peor que no hacer nada (le bajaría la deuda
+              // a la equivocada). Se avisa al usuario para que lo corrija a mano.
+              reminderMsgAddon += `\n⚠️ _No identifiqué qué tarjeta pagaste, así que su deuda no bajó. Corrígelo desde la web._`;
+              console.log(`[Pago Tarjeta] No se pudo identificar la tarjeta pagada con "${textoPago.trim()}". No se crea espejo.`);
+            }
+          } else if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id && !txEspejoTarjeta) {
+            // Es un pago de tarjeta pero no se sabe de qué cuenta salió la plata: sin eso el espejo
+            // haría aparecer dinero de la nada. Nunca falla en silencio; se avisa.
+            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que la deuda de la tarjeta no bajó. Corrígelo desde la web._`;
+            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
+          }
+
           if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id) {
             const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
 
@@ -1342,7 +1458,12 @@ No devuelvas nada más que el JSON limpio.
             }
           }
 
-          const savedTx = await dbInsert(pendingTx);
+          // Con espejo de tarjeta se insertan las dos piernas enlazadas por transfer_id (igual
+          // que el modal web), y el GASTO va PRIMERO: si resultara duplicado, dbInsertPair aborta
+          // y no queda un INGRESO huérfano bajando la deuda sin gasto que lo respalde.
+          const savedTx = txEspejoTarjeta
+            ? (await dbInsertPair(pendingTx, txEspejoTarjeta)).gasto
+            : await dbInsert(pendingTx);
           state.updated_at = new Date().toISOString();
 
           if (SUPABASE_URL && SUPABASE_KEY) {
