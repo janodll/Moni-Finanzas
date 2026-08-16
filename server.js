@@ -1352,7 +1352,6 @@ No devuelvas nada más que el JSON limpio.
           // Lógica de transferencia automática entre cuentas internas
           const normalizeString = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
           const catNorm = normalizeString(pendingTx.categoria);
-          const descNorm = normalizeString(pendingTx.descripcion);
 
           // [Pago Tarjeta] Un pago de tarjeta SIEMPRE debe reducir la deuda de la tarjeta pagada,
           // haya o no un recordatorio enlazado por la IA. Antes el INGRESO espejo vivía solo
@@ -1404,41 +1403,55 @@ No devuelvas nada más que el JSON limpio.
             console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
           }
 
+          // [Transferencia Automática] El correo del banco NO dice a qué cuenta llegó la plata:
+          // solo trae el nombre del destinatario ("Transferencia a Andrea Zuniga Martinez De P.").
+          // Por eso el destino se decide EXCLUSIVAMENTE con lo que Jano escribe en Telegram
+          // (la variable `text`, su respuesta cruda), nunca con la descripción del correo ni con
+          // banco_o_metodo: esos dos nombran el banco de ORIGEN, y usarlos hacía que una
+          // transferencia del BCP de Jano al Interbank de Andrea se acreditara al BCP de Andrea
+          // (caso real, filas 580/581). Un banco mencionado por el banco emisor no es evidencia
+          // del destino; una palabra escrita por el usuario sí lo es.
           if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id) {
             const sourceAccount = (state.cuentas || []).find(c => c.id === pendingTx.cuenta_id);
 
             if (sourceAccount) {
-              // Se identifica origen/destino por el NOMBRE de la cuenta (contiene "Jano"/"Andrea").
-              // El banco se deduce del primer token del nombre.
               const srcName = normalizeString(sourceAccount.nombre);   // ej. "bcp andrea"
-              const srcBanco = srcName.split(' ')[0];                  // ej. "bcp"
               const srcPerson = srcName.includes("andrea") ? "andrea" : "jano";
+              const respuesta = normalizeString(text);                 // lo que escribió el usuario
 
-              let targetPerson = null;
-              if (descNorm.includes("jano") && !srcName.includes("jano")) targetPerson = "jano";
-              else if (descNorm.includes("andrea") && !srcName.includes("andrea")) targetPerson = "andrea";
+              // Coincidencia por PALABRA COMPLETA: "cirujano" no debe contar como "jano",
+              // ni "lejano", etc.
+              const nombra = (palabra) => new RegExp(`\\b${palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(respuesta);
 
-              let targetAccount = null;
-              let samePerson = false;
-              if (targetPerson) {
-                // Transferencia a la cuenta de la OTRA persona (posible mismo banco o distinto).
-                targetAccount = (state.cuentas || []).find(c => {
-                  const n = normalizeString(c.nombre);
-                  return n.includes(targetPerson) && n.split(' ')[0] === srcBanco;
-                });
-              } else {
-                // Transferencia entre dos cuentas de la MISMA persona en OTRO banco
-                // (ej. de "BCP Andrea" a "BBVA Andrea": la descripción nombra el banco
-                // destino, no a otra persona, porque la dueña de ambas cuentas es la misma).
-                targetAccount = (state.cuentas || []).find(c => {
-                  const n = normalizeString(c.nombre);
-                  const banco = n.split(' ')[0];
-                  return banco !== srcBanco && descNorm.includes(banco) && n.includes(srcPerson);
-                });
-                if (targetAccount) { targetPerson = srcPerson; samePerson = true; }
+              const diceJano = nombra("jano");
+              const diceAndrea = nombra("andrea");
+              const bancosDeCuentas = [...new Set((state.cuentas || []).map(c => normalizeString(c.nombre).split(' ')[0]))];
+              const bancosDichos = bancosDeCuentas.filter(b => nombra(b));
+              const diceCuentaPropia = /\bmis?\b/.test(respuesta);     // "a mi bbva", "entre mis cuentas"
+
+              // Si la respuesta no da NINGUNA pista del destino (ni persona ni banco), no hay
+              // con qué decidir: el correo del banco solo trae el nombre del destinatario.
+              // Adivinar aquí es lo que metía la plata en la cuenta equivocada.
+              let finalistas = [];
+              if (diceJano || diceAndrea || bancosDichos.length > 0) {
+                finalistas = (state.cuentas || []).filter(c => c.id !== sourceAccount.id);
+                if (diceJano !== diceAndrea) {
+                  // Nombró exactamente a una persona.
+                  const p = diceAndrea ? "andrea" : "jano";
+                  finalistas = finalistas.filter(c => normalizeString(c.nombre).includes(p));
+                } else if (diceCuentaPropia) {
+                  // "a mi ..." sin nombrar a nadie: es entre cuentas del mismo titular.
+                  finalistas = finalistas.filter(c => normalizeString(c.nombre).includes(srcPerson));
+                }
+                if (bancosDichos.length > 0) {
+                  finalistas = finalistas.filter(c => bancosDichos.includes(normalizeString(c.nombre).split(' ')[0]));
+                }
               }
 
-              if (targetAccount) {
+              if (finalistas.length === 1) {
+                const targetAccount = finalistas[0];
+                const targetPerson = normalizeString(targetAccount.nombre).includes("andrea") ? "andrea" : "jano";
+                const samePerson = targetPerson === srcPerson;
                 const fromPerson = srcPerson.charAt(0).toUpperCase() + srcPerson.slice(1);
                 const toPerson = targetPerson.charAt(0).toUpperCase() + targetPerson.slice(1);
                 await dbInsert({
@@ -1454,8 +1467,23 @@ No devuelvas nada más que el JSON limpio.
                 });
                 pendingTx.descripcion = samePerson ? `Transferencia a mi cuenta ${targetAccount.nombre}` : `Transferencia enviada a ${toPerson}`;
                 console.log(`[Transferencia Automática] Espejo creado de ${sourceAccount.nombre} hacia ${targetAccount.nombre}`);
+              } else if (finalistas.length > 1) {
+                // Varias cuentas posibles y la respuesta no dice cuál: adivinar meteria la plata
+                // en la cuenta equivocada, en silencio. Se pide el dato en vez de inventarlo.
+                const opciones = finalistas.map(c => c.nombre).join(", ");
+                reminderMsgAddon += `\n⚠️ _No sé a qué cuenta fue (${opciones}). El ingreso NO se registró. Responde indicando el banco (ej: "transferencia al interbank de andrea") o agrégalo desde la web._`;
+                console.log(`[Transferencia Automática] Destino ambiguo entre [${opciones}] con la respuesta "${text}". No se crea espejo.`);
+              } else {
+                // O la respuesta no dio ninguna pista del destino, o ninguna cuenta registrada
+                // coincide con lo que dijo. En ambos casos se pide el dato, no se inventa.
+                reminderMsgAddon += `\n⚠️ _No supe a qué cuenta fue, así que el ingreso NO se registró. Responde indicando destino y banco (ej: "transferencia al interbank de andrea"), o regístrala desde la web._`;
+                console.log(`[Transferencia Automática] Sin destino determinable con la respuesta "${text}" (origen ${sourceAccount.nombre}). No se crea espejo.`);
               }
             }
+          } else if (catNorm.includes("transferencia") && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id) {
+            // No se supo de qué cuenta salió: sin origen no hay transferencia que espejar.
+            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió esta transferencia, así que quedó sin asignar. Corrígela desde la web._`;
+            console.log(`[Transferencia Automática] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
           }
 
           // Con espejo de tarjeta se insertan las dos piernas enlazadas por transfer_id (igual
