@@ -1397,9 +1397,20 @@ No devuelvas nada más que el JSON limpio.
               console.log(`[Pago Tarjeta] No se pudo identificar la tarjeta pagada con "${textoPago.trim()}". No se crea espejo.`);
             }
           } else if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id && !txEspejoTarjeta) {
-            // Es un pago de tarjeta pero no se sabe de qué cuenta salió la plata: sin eso el espejo
-            // haría aparecer dinero de la nada. Nunca falla en silencio; se avisa.
-            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que la deuda de la tarjeta no bajó. Corrígelo desde la web._`;
+            // Pago de tarjeta del que no se sabe de qué cuenta salió la plata (típico cuando el
+            // correo es la "constancia de pago" que manda la TARJETA, no la cuenta de débito).
+            // Sin cuenta origen no se puede armar el par.
+            //
+            // CRÍTICO: hay que soltar el tarjeta_id. Estos correos llegan con la tarjeta ya
+            // resuelta, y un GASTO con tarjeta_id le SUMA deuda a esa tarjeta — o sea que un
+            // pago terminaría aumentando la deuda en vez de bajarla, que es el error opuesto y
+            // peor que no hacer nada. Se deja la fila inerte (sin cuenta ni tarjeta) para que
+            // quede el registro visible, y se explica cómo registrarlo bien.
+            if (pendingTx.tarjeta_id) {
+              console.log(`[Pago Tarjeta] Se suelta tarjeta_id ${pendingTx.tarjeta_id}: un GASTO sobre la tarjeta le aumentaría la deuda a un pago.`);
+              pendingTx.tarjeta_id = null;
+            }
+            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que la deuda de la tarjeta NO bajó y este registro quedó sin asignar. Regístralo desde la web en Recordatorios → Pagar._`;
             console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
           }
 
