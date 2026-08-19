@@ -941,8 +941,14 @@
           <h4 id="pay-rem-name" style="margin-top:5px; font-family:'Outfit'; font-size:1.15em;">Luz</h4>
         </div>
         <div class="form-group">
-          <label for="pay-rem-monto">Monto real pagado (S/.)</label>
-          <input type="number" id="pay-rem-monto" step="0.01" min="0.01" class="form-control" required>
+          <label for="pay-rem-monto">Monto real pagado</label>
+          <div style="display:flex; gap:6px; width:100%;">
+            <select id="pay-rem-moneda" class="form-control" style="width:75px; flex-shrink:0; padding-left:8px; padding-right:8px;" title="Moneda">
+              <option value="S/.">S/.</option>
+              <option value="US$">US$</option>
+            </select>
+            <input type="number" id="pay-rem-monto" step="0.01" min="0.01" class="form-control" style="flex:1; min-width:0;" required>
+          </div>
         </div>
         <div class="form-group" id="pay-rem-origen-container">
           <label for="pay-rem-cuenta">¿Con qué cuenta debitar?</label>

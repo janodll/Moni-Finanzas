@@ -758,6 +758,11 @@ export function openPayReminderModal(remId) {
   document.getElementById("pay-rem-name").innerText = rem.nombre;
   document.getElementById("pay-rem-monto").value = rem.monto > 0 ? rem.monto : "";
 
+  // v6: la moneda arranca SIEMPRE en soles, para no arrastrar la elección
+  // de un pago anterior (el modal no se resetea al abrirse).
+  const monedaSel = document.getElementById("pay-rem-moneda");
+  if (monedaSel) monedaSel.value = "S/.";
+
   const isTarjeta = rem.tipo === "Tarjeta";
   document.getElementById("pay-rem-tarjeta-container").style.display = isTarjeta ? "block" : "none";
 

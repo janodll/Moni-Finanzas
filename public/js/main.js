@@ -876,6 +876,9 @@ export function setupFormSubmits() {
       e.preventDefault();
       const remId = parseInt(document.getElementById("pay-rem-id").value);
       const monto = parseFloat(document.getElementById("pay-rem-monto").value);
+      // v6: el pago de tarjeta puede ser en soles o en dólares (la Interbank Jano
+      // tiene deuda en ambas). Por defecto S/. para no cambiar la costumbre.
+      const moneda = document.getElementById("pay-rem-moneda")?.value === "US$" ? "US$" : "S/.";
       const ctaId = parseInt(document.getElementById("pay-rem-cuenta").value);
 
       const rem = state.recordatorios.find(r => parseInt(r.id) === remId);
@@ -898,6 +901,7 @@ export function setupFormSubmits() {
             categoria: "Pago Tarjeta",
             descripcion: `Pago de Tarjeta ${tarjNombre}`,
             monto,
+            moneda,
             tarjeta_id: null,
             cuenta_id: ctaId,
             fijo: "Variable"
@@ -908,6 +912,7 @@ export function setupFormSubmits() {
             categoria: "Pago Tarjeta",
             descripcion: `Pago de Tarjeta ${tarjNombre}`,
             monto,
+            moneda,
             tarjeta_id: tarj ? tarj.id : null,
             cuenta_id: null,
             fijo: "Variable"
@@ -928,6 +933,7 @@ export function setupFormSubmits() {
             categoria: "Servicios",
             descripcion: `Pago de servicio: ${rem.nombre}`,
             monto,
+            moneda,
             tarjeta_id: null,
             cuenta_id: ctaId,
             fijo: "Fijo"
