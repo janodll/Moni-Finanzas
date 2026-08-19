@@ -27,6 +27,34 @@ export function addOneMonth(dateStr) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+// Reprograma un recordatorio al próximo vencimiento que todavía no haya pasado.
+// Sumar un solo mes no alcanza cuando el recordatorio estuvo congelado meses (las
+// tarjetas quedaron sin renovar desde julio): volvería con una fecha ya vencida.
+// Se conserva el DÍA del mes original y se salta directo al primer mes que sirva,
+// para que un vencimiento el 31 no se degrade a 28 al pasar por febrero.
+export function proximoVencimiento(dateStr) {
+  if (!dateStr) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const dia = parseInt(parts[2], 10);
+  if (!dia) return dateStr;
+
+  const ahora = new Date();
+  const hoy = ahora.toISOString().substring(0, 10);
+  if (dateStr >= hoy) return dateStr; // todavía no vence: no se toca
+
+  let y = ahora.getFullYear();
+  let m = ahora.getMonth() + 1; // 1-12
+  for (let i = 0; i < 24; i++) {
+    const ultimoDia = new Date(y, m, 0).getDate(); // día 0 del mes siguiente = último de este
+    const candidato = `${y}-${String(m).padStart(2, '0')}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`;
+    if (candidato >= hoy) return candidato;
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return dateStr;
+}
+
 // Obtener mes actual en formato YYYY-MM
 export function getCurrentMonthString() {
   const d = new Date();

@@ -12,8 +12,8 @@ import {
   formatNumber, 
   formatDateStr, 
   getCurrentMonthString, 
-  calculateBalances, 
-  addOneMonth 
+  calculateBalances,
+  proximoVencimiento
 } from '../calculations.js';
 import { 
   showToast, 
@@ -1353,12 +1353,11 @@ export function executeParsedAction(actionType, data, successMessage) {
       return;
     }
 
-    if (rem.tipo !== "Tarjeta") {
-      rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
-      rem.estado = "Pendiente";
-    } else {
-      rem.estado = "Pagado";
-    }
+    // Servicios Y tarjetas se reprograman al mes siguiente (mismo criterio que el backend
+    // y que el modal). Antes las tarjetas quedaban "Pagado" para siempre y el recordatorio
+    // desaparecía de la lista, dejando sin botón "Pagar" el mes siguiente.
+    rem.fecha_vencimiento = proximoVencimiento(rem.fecha_vencimiento);
+    rem.estado = "Pendiente";
 
     const tx = {
       id: generateUniqueId(),

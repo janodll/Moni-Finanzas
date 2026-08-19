@@ -424,6 +424,35 @@ function addOneMonth(dateStr) {
   return d.toISOString().substring(0, 10);
 }
 
+// Reprograma un recordatorio al próximo vencimiento que todavía no haya pasado.
+// Sumar un solo mes no alcanza cuando el recordatorio estuvo congelado meses (las
+// tarjetas quedaron en "Pagado" desde julio): volvería con una fecha ya vencida.
+// Se conserva el DÍA del mes original y se salta directo al primer mes que sirva,
+// para que un vencimiento el 31 no se degrade a 28 al pasar por febrero.
+// Espejo de proximoVencimiento() en public/js/calculations.js: si cambia uno, cambiar el otro.
+function proximoVencimiento(dateStr) {
+  if (!dateStr) return dateStr;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const dia = parseInt(parts[2], 10);
+  if (!dia) return dateStr;
+
+  const ahora = new Date();
+  const hoy = ahora.toISOString().substring(0, 10);
+  if (dateStr >= hoy) return dateStr; // todavía no vence: no se toca
+
+  let y = ahora.getFullYear();
+  let m = ahora.getMonth() + 1; // 1-12
+  for (let i = 0; i < 24; i++) {
+    const ultimoDia = new Date(y, m, 0).getDate(); // día 0 del mes siguiente = último de este
+    const candidato = `${y}-${String(m).padStart(2, '0')}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`;
+    if (candidato >= hoy) return candidato;
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return dateStr;
+}
+
 // Ejecuta la modificación correspondiente sobre el estado en el backend (duplica lógica de cliente)
 async function executeActionOnState(actionType, data, state) {
   if (actionType === 'transaction') {
@@ -497,12 +526,12 @@ async function executeActionOnState(actionType, data, state) {
       throw new Error("El recordatorio no tiene una tarjeta asociada.");
     }
 
-    if (rem.tipo !== "Tarjeta") {
-      rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
-      rem.estado = "Pendiente";
-    } else {
-      rem.estado = "Pagado";
-    }
+    // Servicios Y tarjetas se reprograman al mes siguiente: los dos vuelven cada mes.
+    // Antes las tarjetas quedaban en "Pagado" para siempre, desaparecían de la lista de
+    // pendientes y el mes siguiente ya no había botón "Pagar" — que es lo que obligaba a
+    // registrar los pagos de tarjeta a mano.
+    rem.fecha_vencimiento = proximoVencimiento(rem.fecha_vencimiento);
+    rem.estado = "Pendiente";
 
     const tx = {
       fecha: new Date().toISOString().substring(0, 10),
@@ -1309,13 +1338,15 @@ No devuelvas nada más que el JSON limpio.
             const remIdx = state.recordatorios.findIndex(r => parseInt(r.id) === parseInt(parsed.recordatorio_pagado_id));
             if (remIdx >= 0) {
               const rem = state.recordatorios[remIdx];
+              // Servicios Y tarjetas se reprograman al mes siguiente (ver el mismo criterio en
+              // executeActionOnState): antes las tarjetas quedaban "Pagado" para siempre y el
+              // recordatorio no volvía nunca más.
+              rem.fecha_vencimiento = proximoVencimiento(rem.fecha_vencimiento);
+              rem.estado = "Pendiente";
               if (rem.tipo !== "Tarjeta") {
-                 rem.fecha_vencimiento = addOneMonth(rem.fecha_vencimiento);
-                 rem.estado = "Pendiente";
-                 reminderMsgAddon = `\n🔔 _Recordatorio "${rem.nombre}" adelantado un mes._`;
-                 console.log(`[Telegram-Webhook] Recordatorio adelantado: ${rem.nombre} al ${rem.fecha_vencimiento}`);
+                 reminderMsgAddon = `\n🔔 _Recordatorio "${rem.nombre}" reprogramado al ${rem.fecha_vencimiento}._`;
+                 console.log(`[Telegram-Webhook] Recordatorio reprogramado: ${rem.nombre} al ${rem.fecha_vencimiento}`);
               } else {
-                 rem.estado = "Pagado";
                  // Un pago de tarjeta debe: (1) salir de una cuenta de débito (el GASTO = pendingTx),
                  // y (2) REDUCIR la deuda de la tarjeta pagada (INGRESO a rem.tarjeta_id), igual que
                  // el modal web. Antes solo se marcaba "Pagado" y la deuda nunca bajaba; peor, si el
