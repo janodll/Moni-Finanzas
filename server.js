@@ -256,33 +256,67 @@ async function getLatestState() {
 }
 
 // Envía un mensaje de Telegram en formato Markdown al chat del usuario y retorna el mensaje enviado (o null)
-async function sendTelegramMessage(chatId, text) {
+// Envía un mensaje por Telegram. Reintenta ante fallos pasajeros: se midió que ~1 de cada 4
+// avisos de gasto no llegaba (11 de 45 pendientes sin telegram_message_id), y como antes esto
+// devolvía null en silencio, el gasto quedaba en la cola sin que nadie preguntara nada.
+// Dos casos se tratan distinto:
+//   - 400 (Markdown roto por un carácter del detalle del banco): reintentar igual no sirve;
+//     se reenvía SIN formato para que el mensaje llegue igual, aunque sea feo.
+//   - 429 (límite de Telegram): se respeta el retry_after que indica la propia API.
+async function sendTelegramMessage(chatId, text, opts = {}) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   if (!token) {
     console.warn("[Telegram] No se configuró TELEGRAM_BOT_TOKEN");
     return null;
   }
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text,
-        parse_mode: 'Markdown'
-      })
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("[Telegram] Error al enviar mensaje:", err);
-      return null;
+  const maxIntentos = opts.maxIntentos ?? 3;
+  let usarFormato = true;
+  let ultimoError = "sin detalle";
+
+  for (let intento = 1; intento <= maxIntentos; intento++) {
+    let esperaMs = 800 * intento;
+    try {
+      const cuerpo = { chat_id: chatId, text };
+      if (usarFormato) cuerpo.parse_mode = 'Markdown';
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cuerpo)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (intento > 1) console.log(`[Telegram] Mensaje enviado en el intento ${intento}.`);
+        return data.result || null;
+      }
+
+      const cuerpoError = await res.text();
+      ultimoError = `HTTP ${res.status}: ${cuerpoError}`;
+      if (res.status === 400 && usarFormato) {
+        // Casi siempre es "can't parse entities": el detalle del banco trae un _ o un *.
+        usarFormato = false;
+        esperaMs = 0;
+        console.warn(`[Telegram] Rechazado por formato; se reintenta sin Markdown. ${ultimoError}`);
+      } else if (res.status === 429) {
+        // Telegram indica en retry_after cuántos segundos hay que esperar.
+        let retryAfter = null;
+        try { retryAfter = JSON.parse(cuerpoError)?.parameters?.retry_after; } catch { /* cuerpo no-JSON */ }
+        if (Number.isFinite(retryAfter) && retryAfter > 0) esperaMs = (retryAfter + 1) * 1000;
+        console.warn(`[Telegram] Límite de envíos; esperando ${esperaMs}ms. ${ultimoError}`);
+      } else {
+        console.warn(`[Telegram] Fallo intento ${intento}/${maxIntentos}. ${ultimoError}`);
+      }
+    } catch (err) {
+      ultimoError = err.message || String(err);
+      console.warn(`[Telegram] Error de red intento ${intento}/${maxIntentos}: ${ultimoError}`);
     }
-    const data = await res.json();
-    return data.result || null;
-  } catch (err) {
-    console.error("[Telegram] Error al enviar mensaje:", err);
-    return null;
+    if (intento < maxIntentos && esperaMs > 0) {
+      await new Promise(r => setTimeout(r, esperaMs));
+    }
   }
+
+  console.error(`[Telegram] NO se pudo enviar tras ${maxIntentos} intentos. Último error: ${ultimoError}`);
+  return null;
 }
 
 // Envía un mensaje de error crítico al administrador
