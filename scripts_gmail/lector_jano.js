@@ -13,7 +13,7 @@ const TELEGRAM_CHAT_ID = props.getProperty('TELEGRAM_CHAT_ID');
 // Google). Reintentar el mismo modelo saturado no sirve; se cae a uno alterno vivo.
 // (gemini-2.5-flash fue descontinuado; no usar.)
 function fetchGeminiConFallback(payload) {
-  const modelos = ['gemini-flash-latest', 'gemini-3.1-flash-lite'];
+  const modelos = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
   const options = {
     method: "post",
     contentType: "application/json",
@@ -95,7 +95,7 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
 }
 
 REGLA DE ORO PARA EL BANCO_O_METODO: Deduce el banco y agrégale "Jano" al final. CRÍTICO — distingue TARJETA DE CRÉDITO vs CUENTA/DÉBITO, porque un mismo banco puede tener ambas:
-- Si el correo es un CONSUMO/PAGO CON TARJETA DE CRÉDITO (menciona "Tarjeta de Crédito", "Visa", "Mastercard", "realizaste un consumo con tu Tarjeta", o un nombre de tarjeta como Clásica/Oro/Premia/Signature/Platinum), ANTEPÓN la palabra "Tarjeta": por ejemplo "Tarjeta Interbank Jano", "Tarjeta BBVA Jano". Falabella siempre es tarjeta: usa "CMR Falabella".
+- Si el correo es un CONSUMO/PAGO CON TARJETA DE CRÉDITO (menciona "Tarjeta de Crédito", "Visa", "Mastercard", "realizaste un consumo con tu Tarjeta", o un nombre de tarjeta como Clásica/Oro/Premia/Signature/Platinum), ANTEPÓN la palabra "Tarjeta": por ejemplo "Tarjeta Interbank Jano", "Tarjeta BBVA Jano". EXCEPCIÓN: si el correo dice explícitamente "Tarjeta de Débito", es DÉBITO, no crédito — no antepongas "Tarjeta". Falabella siempre es tarjeta: usa "CMR Falabella". BCP nunca es tarjeta de crédito (no tienes tarjeta BCP): aunque el correo mencione "tarjeta", trátalo siempre como débito y usa solo "BCP Jano".
 - Si es DÉBITO, cuenta de ahorros, Yape, Plin o transferencia, usa solo el banco: "BCP Jano", "Interbank Jano".
 Esto es crítico para diferenciar tarjeta de crédito, cuenta de débito, y de las de su esposa.
 
