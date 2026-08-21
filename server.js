@@ -1505,11 +1505,16 @@ No devuelvas nada más que el JSON limpio.
               const bancosDichos = bancosDeCuentas.filter(b => nombra(b));
               const diceCuentaPropia = /\bmis?\b/.test(respuesta);     // "a mi bbva", "entre mis cuentas"
 
-              // Si la respuesta no da NINGUNA pista del destino (ni persona ni banco), no hay
-              // con qué decidir: el correo del banco solo trae el nombre del destinatario.
-              // Adivinar aquí es lo que metía la plata en la cuenta equivocada.
+              // Para dar por hecho que la plata se quedó EN CASA hace falta una señal explícita:
+              // que la respuesta nombre a Jano o a Andrea, o que diga "mi/mis cuenta(s)".
+              //
+              // Mencionar un banco NO alcanza, aunque antes sí bastaba: la mayoría de las
+              // transferencias van a terceros, y esos terceros también tienen banco. Con la
+              // regla vieja, "pago del alquiler al bbva del casero" saliendo del BCP de Jano
+              // le acreditaba S/1200 a la cuenta BBVA de Andrea, en silencio. El banco sirve
+              // para DESEMPATAR entre cuentas propias, no para decidir que fue interna.
               let finalistas = [];
-              if (diceJano || diceAndrea || bancosDichos.length > 0) {
+              if (diceJano || diceAndrea || diceCuentaPropia) {
                 finalistas = (state.cuentas || []).filter(c => c.id !== sourceAccount.id);
                 if (diceJano !== diceAndrea) {
                   // Nombró exactamente a una persona.
