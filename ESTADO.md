@@ -78,6 +78,7 @@
 
 Commits en `main`, del más nuevo al más viejo:
 
+- **`871ab1a` — Mencionar un banco ya no prueba que la plata quedó en casa.** Para dar por interna una transferencia bastaba con que la respuesta nombrara un banco. Pero **la mayoría de las transferencias van a terceros, y los terceros también tienen banco**: si solo existía una cuenta propia de ese banco, quedaba una sola candidata y se acreditaba en silencio. Reproducido ejecutando el código que estaba desplegado: *"pago del alquiler al bbva del casero"* desde BCP Jano acreditaba a **BBVA Andrea**; *"le pagué al gasfitero por interbank"* desde Interbank Andrea acreditaba a **Interbank Jano**. Es la misma falla de los pares 362/363 y 371/372 por otra vía. Ahora se exige una señal explícita de interna (nombrar a Jano/Andrea, o decir "mi/mis"); el banco sigue sirviendo para **desempatar**, no para decidir.
 - **`4086b9b` — Telegram reintenta los envíos.** Se midió que **11 de 45 pendientes (~1 de cada 4) nunca se avisaron**: `sendTelegramMessage` devolvía `null` ante cualquier fallo y el llamador lo ignoraba, así que el gasto entraba a la cola y a Jano nunca le preguntaban. Ahora reintenta 3 veces, respeta el `retry_after` de un 429, y ante un 400 (Markdown roto por un `_` en el detalle del banco) **reenvía sin formato** para que el mensaje llegue igual.
 - **`f389159` — Los recordatorios de tarjeta se renuevan.** Al pagarlos quedaban en `"Pagado"` para siempre (los de servicio sí avanzaban un mes), desaparecían de la lista y el mes siguiente no había botón "Pagar" — por eso cada pago de tarjeta terminaba a mano. Arreglado en los **cuatro** caminos: `executeActionOnState`, el webhook de Telegram, el modal web y el asistente web (`public/js/ai/client.js`, este último no estaba en el inventario inicial). Usa `proximoVencimiento()`, no `addOneMonth()`: salta al primer mes futuro y conserva el día (un vencimiento el 31 no se degrada a 28).
 - **`2d69661` — Moneda en el modal de pagos.** El modal solo aceptaba soles; ahora tiene selector S/. | US$ y la moneda se guarda en las dos piernas.
@@ -117,7 +118,20 @@ El bot **solo sabe mandar texto**: `sendTelegramMessage` no usa `reply_markup`, 
 
 **Regla clave:** si el destino es **inequívoco**, registrar directo sin molestar. Los botones son solo para la duda.
 
-**Problemas ALTA que los verificadores encontraron en el intento de implementarlo** (evitarlos): el criterio de "inequívoco" seguía dejando pasar casos ambiguos; se capturaba `tarjeta_id` antes de anularlo y se reducía la deuda de una tarjeta equivocada; y `POST /api/data` empezaba a descargar la tabla entera (576 filas) en cada guardado de la web.
+**⚠️ EL ERROR DE DISEÑO QUE HAY QUE EVITAR (se implementó completo y se revirtió).**
+Se llegó a implementar todo —envío de botones, `answerCallbackQuery`, `preguntas_pendientes`, ruteo de `callback_query`, anti doble toque— y pasó 8 pruebas propias. **Tres verificadores lo rechazaron igual, con 8 problemas ALTA.** El intento quedó guardado en `scratchpad/server.js.botones-intento1` (efímero; si se necesita, rehacer).
+
+La falla de fondo: **el gasto se aparcaba DENTRO de la pregunta y no se insertaba hasta el toque.** Consecuencias:
+- Si nadie tocaba en 72 h, `limpiarPreguntasVencidas` borraba la pregunta **con el gasto adentro**: desaparecía sin insertar ni avisar. Falla silenciosa, justo lo que el proyecto combate.
+- El gasto aparcado era invisible para la desduplicación de auto-register y para los comandos cancelar/limpiar.
+- En el toque se insertaba **antes** de persistir el estado: un corte ahí dejaba la pregunta viva con la plata ya insertada → duplicado al volver a tocar. Agravante verificado: **los pagos de tarjeta reales tienen `nro_operacion: null`** (filas 592, 615, 625), así que el índice UNIQUE no protege de ese duplicado.
+
+**El diseño correcto (invertir el orden):** registrar el GASTO **de inmediato**, como hoy, y usar los botones **solo para agregar la contraparte**. Si el usuario nunca toca, no se pierde nada: queda igual que hoy (gasto registrado, sin espejo). Eso elimina de raíz la pérdida a las 72 h y el riesgo de duplicado.
+
+**Otros ALTA a no repetir:**
+- La tarjeta a acreditar se tomaba de `pendingTx.tarjeta_id` (derivado de `banco_o_metodo`), que es justo la fuente que la rama hermana prohíbe: `resolveAccountOrCard('Tarjeta Interbank')` devuelve **siempre** Interbank Jano, aunque el pago haya sido a la de Andrea. `buscarTarjetaEnTexto` devuelve `null` ahí **a propósito**; el código nuevo lo salteaba.
+- El caso **más frecuente** (transferencia a un tercero) abría botones preguntando "¿a cuál de tus 4 cuentas?" cuando la respuesta correcta es "a ninguna". Antes registraba con un aviso. Cualquier rediseño tiene que tratar "fue a un tercero" como el caso normal, no como la excepción.
+- Se perdía la protección contra un CONSUMO mal categorizado como "Pago Tarjeta": el bot preguntaba afirmando el relato equivocado.
 
 ### 5.3 Menores
 - Saldo en dólares de **Interbank Jano (cuenta id 3)**: quedó en **−US$25.13** porque nunca se le registró saldo inicial en dólares. Falta que Jano diga cuánto tiene.
@@ -151,7 +165,10 @@ El bot **solo sabe mandar texto**: `sendTelegramMessage` no usa `reply_markup`, 
 
 ## 8. Próximo paso concreto
 
-1. **Confirmar el pegado del Apps Script** con la próxima transferencia por BCP (debe decir "BCP Jano", no "Tarjeta BCP Jano").
+1. **Confirmar el pegado del Apps Script** con la próxima transferencia por BCP (debe decir "BCP Jano", no "Tarjeta BCP Jano"). Ya pegado el 2026-08-21; falta la prueba con una transferencia.
 2. **Atacar la confirmación falsa** (5.1), en pedazos chicos y con verificación adversarial.
-3. **Implementar los botones** (5.2) usando el diseño ya hecho, evitando los ALTA listados.
+3. **Rehacer los botones** (5.2) con el orden invertido: **registrar el gasto primero, preguntar solo por la contraparte.** No repetir el diseño de aparcar el gasto dentro de la pregunta.
 4. Cuando Jano lo diga: saldo en dólares de Interbank Jano, y el recordatorio huérfano 165.
+
+### Marcador de la sesión 2026-08-21
+Cuatro implementaciones se rechazaron en el día (tres de agentes, una propia), todas de la misma clase: mover plata a partir de un dato que no existía. Lo que **sí** llegó a producción fueron siete cambios chicos, cada uno verificado con un test aislado antes de subir. **Ese es el ritmo que funciona en este proyecto.** Los verificadores adversariales encontraron bugs reales en las cuatro; no desplegar nada de esta familia sin pasar por ellos.
