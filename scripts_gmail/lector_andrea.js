@@ -13,9 +13,10 @@ const TELEGRAM_CHAT_ID = props.getProperty('TELEGRAM_CHAT_ID');
 
 // Llama a Gemini probando varios modelos ante 503/429 (modelo saturado del lado de
 // Google). Reintentar el mismo modelo saturado no sirve; se cae a uno alterno vivo.
-// (gemini-2.5-flash fue descontinuado; no usar.)
+// No usar la linea Flash grande (gemini-3.7-flash): medido el 2026-09-01, devuelve 429
+// tras 8 reintentos y promedia 127s por correo.
 function fetchGeminiConFallback(payload) {
-  const modelos = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  const modelos = ['gemini-3.5-flash-lite', 'gemini-flash-latest'];
   const options = {
     method: "post",
     contentType: "application/json",

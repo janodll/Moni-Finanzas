@@ -667,8 +667,10 @@ async function geminiGenerateContent(apiKey, body, label = 'Gemini') {
   // Se usa PRIMERO el modelo barato (flash-lite, ~1/3 del costo) porque las tareas
   // son simples (extraer JSON / categorizar) y no necesitan el flash grande. flash-latest
   // queda de respaldo si el lite se satura (503/429).
-  // (No usar gemini-2.5-flash: descontinuado por Google en jul-2026.)
-  const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
+  // No subir a la linea Flash grande (gemini-3.7-flash y similares): medido el 2026-09-01
+  // con la API key del proyecto devolvio 429 tras 8 reintentos en 5 de 7 casos y promedio
+  // 127s por correo; Telegram reentrega el update mucho antes de eso.
+  const modelsToTry = ['gemini-3.5-flash-lite', 'gemini-flash-latest'];
   const payload = typeof body === 'string' ? body : JSON.stringify(body);
   let response;
   for (const modelName of modelsToTry) {
