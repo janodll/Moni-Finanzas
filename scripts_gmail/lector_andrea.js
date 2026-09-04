@@ -91,8 +91,15 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
   "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>"
 }
 
-REGLA DE ORO PARA EL BANCO_O_METODO: Deduce el banco y agrégale "Andrea" al final. CRÍTICO — distingue TARJETA DE CRÉDITO vs CUENTA/DÉBITO, porque un mismo banco puede tener ambas:
-- Si el correo es un CONSUMO/PAGO CON TARJETA DE CRÉDITO (menciona "Tarjeta de Crédito", "Visa", "Mastercard", "realizaste un consumo con tu Tarjeta", o un nombre de tarjeta como Clásica/Oro/Premia/Signature/Platinum), ANTEPÓN la palabra "Tarjeta": por ejemplo "Tarjeta Interbank Andrea", "Tarjeta BBVA Andrea". EXCEPCIÓN: si el correo dice explícitamente "Tarjeta de Débito", es DÉBITO, no crédito — no antepongas "Tarjeta". Falabella siempre es tarjeta: usa "CMR Falabella". Cencosud siempre es tarjeta: usa "Tarjeta Cencosud Andrea". BCP nunca es tarjeta de crédito (Andrea no tiene tarjeta BCP): aunque el correo mencione "tarjeta", trátalo siempre como débito y usa solo "BCP Andrea".
+REGLA DE ORO PARA EL BANCO_O_METODO:
+
+PASO 1 — EXCEPCIONES. Revísalas ANTES que nada. Si alguna aplica, usa el valor EXACTO indicado y no le agregues ni le quites nada (ni el nombre de la persona, ni la palabra "Tarjeta"):
+- Falabella o CMR, en cualquier forma que aparezca -> exactamente: CMR Falabella
+- Cencosud, en cualquier forma -> exactamente: Tarjeta Cencosud Andrea
+- BCP, en cualquier forma -> exactamente: BCP Andrea. No existe ninguna tarjeta de crédito BCP; aunque el correo diga "tarjeta", es débito.
+
+PASO 2 — Solo si NO aplicó ninguna excepción del PASO 1: deduce el banco y agrégale "Andrea" al final. CRÍTICO — distingue TARJETA DE CRÉDITO vs CUENTA/DÉBITO, porque un mismo banco puede tener ambas:
+- Si el correo es un CONSUMO/PAGO CON TARJETA DE CRÉDITO (menciona "Tarjeta de Crédito", "Visa", "Mastercard", "realizaste un consumo con tu Tarjeta", o un nombre de tarjeta como Clásica/Oro/Premia/Signature/Platinum), ANTEPÓN la palabra "Tarjeta": por ejemplo "Tarjeta Interbank Andrea", "Tarjeta BBVA Andrea". EXCEPCIÓN: si el correo dice explícitamente "Tarjeta de Débito", es DÉBITO, no crédito — no antepongas "Tarjeta".
 - Si es DÉBITO, cuenta de ahorros, Yape, Plin o transferencia, usa solo el banco: "BCP Andrea", "Interbank Andrea".
 Esto es crítico para diferenciar tarjeta de crédito, cuenta de débito, y de las de su esposo.
 
