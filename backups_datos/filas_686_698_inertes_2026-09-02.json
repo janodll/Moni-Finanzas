@@ -1,0 +1,38 @@
+[
+ {
+  "id": 686,
+  "fecha": "2026-08-30",
+  "tipo": "GASTO",
+  "categoria": "Vivienda",
+  "descripcion": "Alquiler casa (Terry De Bordone Maria Sara E.)",
+  "monto": 500,
+  "moneda": "US$",
+  "cuenta_id": null,
+  "tarjeta_id": null,
+  "fijo": "Variable",
+  "nro_operacion": "06931124",
+  "transfer_id": null,
+  "banco_o_metodo": "Tarjeta BCP Andrea",
+  "descripcion_original": "Terry De Bordone Maria Sara E.",
+  "telegram_message_id": 1048,
+  "created_at": "2026-08-30T14:01:54.18+00:00"
+ },
+ {
+  "id": 698,
+  "fecha": "2026-08-31",
+  "tipo": "GASTO",
+  "categoria": "Vivienda",
+  "descripcion": "Mantenimiento casa",
+  "monto": 250,
+  "moneda": "S/.",
+  "cuenta_id": null,
+  "tarjeta_id": null,
+  "fijo": "Variable",
+  "nro_operacion": "06354165",
+  "transfer_id": null,
+  "banco_o_metodo": "Tarjeta BCP Andrea",
+  "descripcion_original": "Terry De Bordone Maria Sara E.",
+  "telegram_message_id": 1097,
+  "created_at": "2026-09-01T13:21:05.533+00:00"
+ }
+]

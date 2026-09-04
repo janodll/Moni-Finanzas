@@ -1,7 +1,8 @@
 # ESTADO — Traspaso de sesión (Moni Finanzas)
 
 > Pega este archivo al inicio de la sesión nueva para retomar sin perder contexto.
-> **Fecha del traspaso: 2026-08-21.** Todo lo de abajo refleja el estado real verificado al cerrar.
+> **Fecha del traspaso: 2026-08-27.** Todo lo de abajo refleja el estado real verificado al cerrar.
+> Las secciones 1-8 son del cierre del 2026-08-21 y siguen vigentes: **no se tocó código después de esa fecha**. La sección 9 cubre lo que pasó entre el 22 y el 27 de agosto.
 
 ---
 
@@ -172,3 +173,57 @@ La falla de fondo: **el gasto se aparcaba DENTRO de la pregunta y no se insertab
 
 ### Marcador de la sesión 2026-08-21
 Cuatro implementaciones se rechazaron en el día (tres de agentes, una propia), todas de la misma clase: mover plata a partir de un dato que no existía. Lo que **sí** llegó a producción fueron siete cambios chicos, cada uno verificado con un test aislado antes de subir. **Ese es el ritmo que funciona en este proyecto.** Los verificadores adversariales encontraron bugs reales en las cuatro; no desplegar nada de esta familia sin pasar por ellos.
+
+---
+
+## 9. Sesión 2026-08-22 → 2026-08-27 — reporte de gastos, sin cambios de código
+
+**No se desplegó nada. No se modificó `server.js` ni los lectores.** Los pendientes grandes (5.1 confirmación falsa, 5.2 botones de Telegram) siguen **intactos y son el próximo trabajo real**.
+
+### Lo que se hizo
+Se generó **`auditorias_y_reportes/reporte-julio-agosto-2026.md`** (27/08): gasto de julio y agosto por categoría, con proyección de agosto. Números clave: julio cerró en **−S/. 2,916.04** por la moto de S/. 6,995; sin esa compra única el mes daba **+S/. 3,630.96**. Agosto al día 26 iba en **S/. 4,573.43** de gasto contra **S/. 5,003.30** de ingresos.
+
+### Cuatro correcciones de datos que salieron de Jano, no del sistema
+El primer borrador del reporte estaba mal en cuatro puntos y **las cuatro las detectó Jano leyéndolo**. Vale la pena registrarlas porque son fallas de captura, no de reporte:
+
+1. **Audífonos S/. 729.30 (08/08) — compra cancelada que seguía viva.** Fue una compra online que Jano canceló y se olvidó de borrar. Se eliminó de Supabase (fila 540). Copia en `backups_datos/fila_540_audifonos_cancelados.json`. Efecto: deuda de la tarjeta BBVA bajó de S/. 2,932.95 a **S/. 2,203.65**; Entretenimiento de agosto bajó de S/. 1,489 a **S/. 759.80**.
+2. **Seguros de salud: son mensuales, no anuales.** El sistema los estaba leyendo como pago anual. Faltaban **S/. 448** de julio que nunca se capturaron.
+3. **Tres gastos reembolsados se contaban como propios.** Plata que Jano adelantó y le devolvieron, sumando a su gasto.
+4. **Compra de gaseosas por mayor leída como salida a comer.** Una compra de oferta que dura 2-3 meses estaba inflando "comer fuera" de agosto. Es el mismo patrón de fondo del proyecto: **el correo del banco no distingue una compra de stock de un consumo del día.**
+
+### Lo que quedó pendiente **de Jano** (no del código)
+- **Anotar los S/. 700 del concierto** en "Por Cobrar", para octubre.
+- **Verificar el estado de cuenta de la tarjeta BBVA**: si el banco nunca llegó a cobrar los audífonos cancelados, debe decir **S/. 2,203.65**.
+- **Vigilar la próxima transferencia por BCP**: es la prueba concluyente del Apps Script pegado el 21/08. Debe llegar como **"BCP Jano"** y **no** como "Tarjeta BCP Jano" (ver sección 4).
+
+### Las filas INERTES: registradas, confirmadas, e invisibles (2026-09-02)
+
+**Sintoma:** Jano reporta que el alquiler de US$500 (30/08) y el mantenimiento de S/250 (31/08) "nunca llegaron a Moni", pese a que Telegram confirmo "Registrado con exito" en los dos.
+
+**No era una confirmacion falsa.** Las dos filas SI estaban insertadas (ids 686 y 698). Entraron **inertes**: `cuenta_id` null y `tarjeta_id` null, asi que no mueven ningun saldo. Registradas, confirmadas, e invisibles en la app. Para el usuario es identico a que no existieran — y es peor que un error visible, porque no hay nada que revisar.
+
+**Causa raiz, dos capas:**
+
+1. El lector escribio `banco_o_metodo = "Tarjeta BCP Andrea"`. El prompt dice explicitamente que BCP nunca es tarjeta de credito, pero **la excepcion vive dentro de la regla general** ("deduce el banco y agregale el nombre al final") y el modelo aplica la regla y se come la excepcion. Es la MISMA falla que produce `"CMR Falabella Jano"` en vez de `"CMR Falabella"`. Es un patron del prompt, no del modelo: cambiar de modelo no lo arregla (se verifico con 3.1-flash-lite y 3.5-flash-lite: los dos fallan igual).
+2. `resolveAccountOrCard` trataba la rama de tarjeta como **puerta de un solo sentido**: al entrar por `query.includes('tarjeta')` y no calzar ninguna tarjeta (no existe ninguna BCP), devolvia los dos ids en null en vez de intentar por cuenta. La regla que resuelve BCP vive en la rama `else`, inalcanzable. Lo mas revelador: el llamador **ya sabia** que no era tarjeta — su lista de `isCreditCard` no incluye `"tarjeta bcp"` — pero el resolvedor re-decidia por su cuenta leyendo la palabra "tarjeta" del texto.
+
+**Arreglado** en `70f110d`: si ninguna tarjeta calza, se sigue a la busqueda por cuenta. Solo puede convertir nulls en cuenta resuelta; nunca cambia una tarjeta que ya calzaba. La funcion se movio a `resolver.js` (server.js levanta el servidor al importarse y no se podia probar sola) con `tests/resolver.test.js`: los dos bugs mas 12 casos de regresion.
+
+**Segundo bug, encontrado por el test:** con `banco_o_metodo` vacio, `query = ''` hacia que `name.includes('')` fuera true para todas y la fila caia en **la primera cuenta del array (BCP Jano) por puro orden**. Plata asignada por accidente. Ahora un texto vacio devuelve null.
+
+**Datos:** ids 686 y 698 corregidos a `cuenta_id=2` (BCP Andrea) el 2026-09-02, con relectura independiente. Respaldo en `backups_datos/filas_686_698_inertes_2026-09-02.json`.
+
+**Las 3 filas inertes de julio se dejan como estan por decision de Jano** (ids 495 S/400, 461 S/14.95, 364 S/2.04). Ya compenso esos saldos en su momento con un movimiento de ajuste, asi que **corregirlas ahora duplicaria la correccion**. No tocarlas. Si algun dia se cuadra julio contra el estado de cuenta y aparece una diferencia de ~S/417, la explicacion es esta, no un bug nuevo.
+
+**Lo que sigue faltando (y es lo que cierra el "todos los meses pasa algo"):** cuando una fila queda inerte, Telegram igual dice "Registrado con exito". El bot confirma sin mirar si la plata se movio. Una fila con `cuenta_id` y `tarjeta_id` en null deberia avisar, no confirmar. Es hermano del pendiente 5.1 y va en el flujo de Telegram — donde tres intentos previos fueron rechazados por los verificadores. Hacerlo por pedazos chicos.
+
+### Trampa recurrente: los reembolsos inflan todo reporte
+
+**Ya mordió dos veces** (reporte de julio-agosto el 27/08, reporte de agosto el 01/09). Los reembolsos entran a Moni como **INGRESO de categoría "Otros"**, sin ningún vínculo al gasto que devuelven. El gasto original queda contado como propio, así que **todo reporte sobrestima lo que Jano gasta** hasta que alguien cruza a mano.
+
+En agosto 2026 fueron **siete movimientos por S/. 999.86**: Google Workspace 589.86, collar de Kyra 209, torta Maria Almenara 54.50, alitas de fío 45, pádel 31.50, y la devolución de S/. 70 del préstamo a Telto. El primer borrador del reporte llegó a señalar el pago de Google Workspace como "la principal fuga del mes" cuando ya se lo habían reembolsado cuatro días después.
+
+**Antes de cualquier reporte: listar los INGRESO de categoría "Otros" del período y cruzarlos contra los gastos por monto y fecha.** El arreglo de fondo —que el reembolso apunte al gasto original— sigue pendiente en el sistema.
+
+### Nota de método
+Esta conversación llegó a **824,000 tokens** de historial acumulado (arrancó el 20/07). Cada vez que Jano volvía a ella tras varias horas, se reprocesaba el historial completo: **~25% del límite de 5 horas del plan Pro por un solo mensaje**, aunque fuera una palabra. Siete veces en un día. **Este archivo existe para no repetir eso**: cerrar la conversación cuando se pone pesada y arrancar una nueva leyendo el ESTADO.
