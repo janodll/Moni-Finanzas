@@ -6,6 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
+import { resolveAccountOrCard } from './resolver.js';
 
 const stateMutex = new Mutex();
 
@@ -328,89 +329,6 @@ async function notifyAdminError(context, errorMessage) {
 }
 
 
-// Mapea el texto del banco o método recibido a un cuenta_id o tarjeta_id real
-function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
-  const query = (banco_o_metodo || '').toLowerCase();
-
-  // Elige la tarjeta/cuenta de la persona correcta cuando el banco existe para ambos
-  // (ej. Interbank tiene tarjeta de Jano Y de Andrea). Si el query no nombra persona,
-  // no restringe.
-  // Rechaza solo si el nombre pertenece a la OTRA persona (una tarjeta sin persona en
-  // el nombre, ej. "Tarjeta BBVA", se acepta igual).
-  const personOk = (name) => {
-    if (query.includes('andrea')) return !name.includes('jano');
-    if (query.includes('jano')) return !name.includes('andrea');
-    return true;
-  };
-
-  if (isCreditCard || query.includes('tarjeta') || query.includes('cmr') || query.includes('falabella')) {
-    // Buscar en tarjetas (respetando la persona)
-    for (const t of state.tarjetas || []) {
-      const name = t.nombre.toLowerCase();
-      const matchesBank =
-          name.includes(query) ||
-          (query.includes('cmr') && name.includes('falabella')) ||
-          (query.includes('falabella') && name.includes('cmr')) ||
-          (query.includes('bbva') && name.includes('bbva')) ||
-          (query.includes('interbank') && name.includes('interbank'));
-      if (matchesBank && personOk(name)) {
-        return { cuenta_id: null, tarjeta_id: t.id };
-      }
-    }
-    // Fallbacks específicos de tarjeta
-    if (query.includes('falabella') || query.includes('cmr')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('falabella') || t.nombre.toLowerCase().includes('cmr'));
-      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
-    }
-    if (query.includes('bbva')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('bbva') && personOk(t.nombre.toLowerCase()));
-      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
-    }
-    if (query.includes('interbank')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('interbank') && personOk(t.nombre.toLowerCase()));
-      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
-    }
-    if (query.includes('cencosud')) {
-      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('cencosud') && personOk(t.nombre.toLowerCase()));
-      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
-    }
-  } else {
-    // Buscar en cuentas (débito)
-    for (const c of state.cuentas || []) {
-      const name = c.nombre.toLowerCase();
-      if (name.includes(query)) {
-        return { cuenta_id: c.id, tarjeta_id: null };
-      }
-    }
-    
-    // Fallbacks específicos de débito/billeteras
-    if (query.includes('yape')) {
-      const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Jano';
-      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
-      if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
-    }
-    if (query.includes('plin')) {
-      const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Jano';
-      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
-      if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
-    }
-    if (query.includes('bcp')) {
-      const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Jano';
-      const bcpAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('bcp') && c.titular === titular);
-      if (bcpAcc) return { cuenta_id: bcpAcc.id, tarjeta_id: null };
-    }
-    if (query.includes('interbank')) {
-      const isAndrea = query.includes('andrea');
-      const titular = isAndrea ? 'Andrea' : 'Jano';
-      const ibkAcc = (state.cuentas || []).find(c => c.nombre.toLowerCase().includes('interbank') && c.titular === titular);
-      if (ibkAcc) return { cuenta_id: ibkAcc.id, tarjeta_id: null };
-    }
-  }
-  return { cuenta_id: null, tarjeta_id: null };
-}
 
 // Busca en state.tarjetas la única tarjeta nombrada dentro de un texto libre.
 // Mismo enfoque que el bloque [Transferencia Automática]: se normaliza el texto (minúsculas,
