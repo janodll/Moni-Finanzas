@@ -99,3 +99,47 @@ export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
   }
   return { cuenta_id: null, tarjeta_id: null };
 }
+
+// Busca en state.cuentas la unica cuenta nombrada dentro de un texto libre.
+// Hermana de buscarTarjetaEnTexto (server.js), con la misma prudencia: devuelve null si
+// hay 0 candidatas, o si quedan varias y el texto no nombra a una persona para desempatar.
+//
+// El texto que se le pasa SIEMPRE debe ser lo que el usuario escribio en Telegram, nunca
+// descripcion_original ni banco_o_metodo: esos dos nombran el banco de ORIGEN del correo y
+// usarlos es justo lo que acreditaba la plata en la cuenta equivocada (ver ESTADO seccion 2).
+//
+// A diferencia de buscarTarjetaEnTexto, aqui la persona se busca por palabra completa:
+// "cirujano" contiene "jano" y no debe desempatar nada.
+export function buscarCuentaEnTexto(texto, state) {
+  const norm = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const t = norm(texto);
+  if (!t.trim()) return null;
+
+  const nombra = (palabra) => new RegExp(`\\b${palabra}\\b`).test(t);
+  const nombraJano = nombra("jano");
+  const nombraAndrea = nombra("andrea");
+  // Si nombra a las DOS no se puede desempatar: se trata como si no nombrara a ninguna.
+  const persona = (nombraJano && nombraAndrea) ? null : (nombraAndrea ? "andrea" : (nombraJano ? "jano" : null));
+
+  const candidatas = (state.cuentas || []).filter(c => {
+    const nombre = norm(c.nombre);
+    // Tokens que identifican al banco: "bcp", "interbank", "bbva"... se descartan las
+    // palabras genericas y los nombres de persona.
+    const tokens = nombre.split(' ').filter(w => w.length >= 3 && w !== 'cuenta' && w !== 'jano' && w !== 'andrea');
+    if (tokens.length === 0) return false;
+    if (!tokens.some(w => t.includes(w))) return false;
+    if (persona === 'andrea' && nombre.includes('jano')) return false;
+    if (persona === 'jano' && nombre.includes('andrea')) return false;
+    return true;
+  });
+
+  if (candidatas.length === 1) return candidatas[0];
+
+  // Varias del mismo banco (ej. "Interbank Jano" vs "Interbank Andrea"): solo se resuelve
+  // si el texto nombra explicitamente a una de las dos personas.
+  if (candidatas.length > 1 && persona) {
+    const dePersona = candidatas.filter(c => norm(c.nombre).includes(persona));
+    if (dePersona.length === 1) return dePersona[0];
+  }
+  return null;
+}

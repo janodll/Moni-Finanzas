@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
-import { resolveAccountOrCard } from './resolver.js';
+import { resolveAccountOrCard, buscarCuentaEnTexto } from './resolver.js';
 
 const stateMutex = new Mutex();
 
@@ -1391,12 +1391,26 @@ No devuelvas nada más que el JSON limpio.
             // pago terminaría aumentando la deuda en vez de bajarla, que es el error opuesto y
             // peor que no hacer nada. Se deja la fila inerte (sin cuenta ni tarjeta) para que
             // quede el registro visible, y se explica cómo registrarlo bien.
+            // Ultimo intento antes de rendirse: que la cuenta la haya nombrado el propio Jano
+            // en su respuesta. Se mira SOLO `text` (lo que el escribio), nunca banco_o_metodo
+            // ni descripcion_original — esos nombran el banco de ORIGEN del correo y usarlos es
+            // exactamente lo que acreditaba la plata en la cuenta equivocada (ESTADO seccion 2).
+            // buscarCuentaEnTexto devuelve null ante cualquier ambiguedad, asi que esto solo
+            // puede completar una fila que igual iba a quedar inerte; nunca cambia una ya resuelta.
+            const cuentaDicha = buscarCuentaEnTexto(text, state);
+            if (cuentaDicha) {
+              pendingTx.cuenta_id = cuentaDicha.id;
+              pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta una tarjeta
+              reminderMsgAddon += `\n🏦 _Pago registrado desde "${cuentaDicha.nombre}"._`;
+              console.log(`[Pago Tarjeta] Cuenta de origen tomada de la respuesta del usuario: ${cuentaDicha.nombre} (id=${cuentaDicha.id}).`);
+            } else {
             if (pendingTx.tarjeta_id) {
               console.log(`[Pago Tarjeta] Se suelta tarjeta_id ${pendingTx.tarjeta_id}: un GASTO sobre la tarjeta le aumentaría la deuda a un pago.`);
               pendingTx.tarjeta_id = null;
             }
-            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que la deuda de la tarjeta NO bajó y este registro quedó sin asignar. Regístralo desde la web en Recordatorios → Pagar._`;
-            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
+            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que quedó sin asignar y el saldo de tu cuenta no bajó._\n💡 _La próxima vez dime la cuenta en tu respuesta (ej: "pagué la tarjeta desde Interbank Jano") y lo completo solo._`;
+            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}", respuesta="${(text || '').trim()}"). No se crea espejo.`);
+            }
           }
 
           // [Transferencia Automática] El correo del banco NO dice a qué cuenta llegó la plata:
