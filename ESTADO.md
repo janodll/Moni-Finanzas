@@ -217,6 +217,28 @@ El primer borrador del reporte estaba mal en cuatro puntos y **las cuatro las de
 
 **Lo que sigue faltando (y es lo que cierra el "todos los meses pasa algo"):** cuando una fila queda inerte, Telegram igual dice "Registrado con exito". El bot confirma sin mirar si la plata se movio. Una fila con `cuenta_id` y `tarjeta_id` en null deberia avisar, no confirmar. Es hermano del pendiente 5.1 y va en el flujo de Telegram — donde tres intentos previos fueron rechazados por los verificadores. Hacerlo por pedazos chicos.
 
+### Cierre del 2026-09-17: cuadre forzado, y lo que sigue roto
+
+**Qué se hizo el 16/09**
+
+- **Se registraron los movimientos identificados que faltaban:** los Yape recibidos de Santiago (S/ 20) y Steven (S/ 40) del 13/09 en BCP Jano (ids 776, 777), y dos pagos de tarjeta del 15/09 como pares: S/ 299.31 de la cuenta Interbank Jano a su tarjeta (778/779) y S/ 491.04 de la cuenta Interbank Andrea a su tarjeta (780/781).
+- **Cuadre forzado de las 5 cuentas de débito** a los saldos reales del banco (ids 782-787): BCP Jano a S/ 165.00, Interbank Jano a S/ 105.90, y las tres de Andrea a cero en soles y dólares. **Neto agregado por los cuadres míos: +S/ 201.16** (7/09 y 16/09 juntos). Respaldo en `backups_datos/cuadre_saldos_2026-09-16.json`.
+- **Se vació la cola de Telegram**, que tenía 31 pendientes, algunos del 20/08. Respaldo completo en `backups_datos/cola_pendientes_vaciada_2026-09-16.json`. Motivo: tras un cuadre forzado, responder un pendiente viejo lo cuenta dos veces.
+- **Los recordatorios NO se tocaron**, por decisión de Jano ("ya ni me guío de esos"). Los de las tarjetas Interbank quedaron en "Pendiente" con vencimiento 15/09 pese a estar pagadas. **No usar el botón "Pagar" de la web en esas: registraría el pago de nuevo.**
+
+**Por qué se descuadró: tres causas confirmadas y una sin resolver**
+
+1. **La app web pisa la cola de pendientes.** `saveState()` (public/js/state.js) manda todo el estado que cargó al abrirse, incluida `transacciones_pendientes`, y `/api/data` lo sobrescribe entero. La app nunca lee ni modifica esa cola: solo la reenvía vieja. Si la app quedó abierta, cualquier guardado borra los pendientes que llegaron después. Hay 45 acciones que guardan y la app no refresca sola. **CONFIRMADO en código, sin arreglar.**
+2. **El lector descarta correos en silencio.** Si Gemini responde `IGNORAR`, `extraerDatosConGemini` devuelve true, el correo se marca leído y no hay alerta. Medido: el mismo correo de constancia de pago dio IGNORAR 1 de cada 2 veces en el lector de Jano. Además solo busca `newer_than:1d`: lo que se atasca más de un día se pierde. **CONFIRMADO, sin arreglar.**
+3. **Duplicados por ceros a la izquierda.** Cada Yape llega en dos correos (Yape y BCP) y el nro_operacion viene `02505825` en uno y `2505825` en el otro. La comparación es por texto, no los reconoce iguales y el segundo entra a la cola. **CONFIRMADO, sin arreglar.**
+4. **Sin resolver:** el pago de S/ 491.04 de Andrea (15/09) nunca llegó al servidor pese a que su lector lee ese correo bien en pruebas (2 de 2), el correo existía y no hubo aviso en Telegram. Se descartaron: carrera entre correos simultáneos (hay mutex), duplicado por nro_operacion (ninguno repetido), y lentitud del modelo 3.5-flash-lite (mide 1.6 s por correo, más rápido que el anterior). Los avisos de fallo de Apps Script del 15-16/09 son errores transitorios de Google y no explican pérdidas, solo posibles duplicados.
+
+**Decisión: NO se implementa el vínculo reembolso → gasto (2026-09-17)**
+
+Jano lo descartó por tamaño del cambio. El problema real que queda sin resolver: un reembolso entra como INGRESO y el gasto original queda por su monto completo, así que **ingresos y egresos de los reportes quedan inflados por el mismo monto**. Ejemplo suyo: pizza de S/ 100, le devuelven S/ 60, gasto propio S/ 40, pero Moni muestra 100 de gasto y 60 de ingreso. Los saldos de las cuentas no se ven afectados, solo los reportes.
+
+Lo mismo pasa con la plata que solo pasa por la cuenta y no tiene gasto registrado (la cuota de S/ 245 de Mariana). **Al leer cualquier reporte hay que descontar a mano estos dos casos.** En setiembre, de S/ 2,418 de "ingresos del mes", el ingreso propio eran S/ 2,086: solo lo categorizado como Sueldo más la venta del monitor.
+
 ### Trampa recurrente: los reembolsos inflan todo reporte
 
 **Ya mordió dos veces** (reporte de julio-agosto el 27/08, reporte de agosto el 01/09). Los reembolsos entran a Moni como **INGRESO de categoría "Otros"**, sin ningún vínculo al gasto que devuelven. El gasto original queda contado como propio, así que **todo reporte sobrestima lo que Jano gasta** hasta que alguien cruza a mano.

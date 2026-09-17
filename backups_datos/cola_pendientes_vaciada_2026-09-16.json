@@ -1,0 +1,1212 @@
+{
+ "respaldado": "2026-09-16T23:24:54.758132+00:00",
+ "updated_at_original": "2026-09-16T22:33:57.832+00:00",
+ "transacciones_pendientes": [
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-20",
+   "monto": 133.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-20T22:40:03.603Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "623222025969",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 897,
+   "descripcion_original": "Dlc Pedidosya Edo Sushi Blima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-21",
+   "monto": 1,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-21T00:13:47.727Z",
+   "tarjeta_id": 2,
+   "nro_operacion": null,
+   "banco_o_metodo": "Tarjeta Interbank Jano",
+   "telegram_message_id": 901,
+   "descripcion_original": "DLC*TEMU PE"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-21",
+   "monto": 1,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-08-21T00:40:32.847Z",
+   "tarjeta_id": null,
+   "nro_operacion": "430805",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 904,
+   "descripcion_original": "DLC*TEMU PE"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-21",
+   "monto": 10.1,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-21T03:21:51.784Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "623303750377",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 926,
+   "descripcion_original": "Dlc Uber Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-21",
+   "monto": 50,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-21T16:19:04.233Z",
+   "tarjeta_id": null,
+   "nro_operacion": "LP0365903900010",
+   "banco_o_metodo": "Tarjeta Visa Andrea",
+   "telegram_message_id": 927,
+   "descripcion_original": "ELIDA ROCIO CAPARACHIN TORREJON"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-27",
+   "monto": 95,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-27T01:12:23.654Z",
+   "tarjeta_id": null,
+   "nro_operacion": "AP4619974",
+   "banco_o_metodo": "Tarjeta Visa Andrea",
+   "telegram_message_id": 994,
+   "descripcion_original": "CGH WEB"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "INGRESO",
+   "fecha": "2026-08-27",
+   "monto": 1101.26,
+   "moneda": "US$",
+   "cuenta_id": 2,
+   "created_at": "2026-08-27T21:47:04.671Z",
+   "tarjeta_id": null,
+   "nro_operacion": "AF533895",
+   "banco_o_metodo": "BCP Andrea",
+   "telegram_message_id": 999,
+   "descripcion_original": "Transferencia del exterior de GLOBO LANGUAGE SOLUTIONS LLC"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-28",
+   "monto": 35.5,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-08-28T03:06:10.962Z",
+   "tarjeta_id": null,
+   "nro_operacion": "642543",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1002,
+   "descripcion_original": "PLIN-EIJI JUNIOR LAY"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-28",
+   "monto": 14.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-28T14:53:57.596Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "624014810787",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 1006,
+   "descripcion_original": "Pyu Uber Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-28",
+   "monto": 14.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-28T14:54:01.238Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "624014287682",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 1007,
+   "descripcion_original": "Dlc Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-28",
+   "monto": 9.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-08-28T17:58:54.549Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "624017897976",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 1011,
+   "descripcion_original": "Pyu Uber Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-08-28",
+   "monto": 14,
+   "moneda": "S/.",
+   "cuenta_id": 2,
+   "created_at": "2026-08-28T19:51:53.556Z",
+   "tarjeta_id": null,
+   "nro_operacion": "18445040",
+   "banco_o_metodo": "BCP Andrea",
+   "telegram_message_id": 1037,
+   "descripcion_original": "Luz Cam"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-01",
+   "monto": 1640.52,
+   "moneda": "S/.",
+   "cuenta_id": 2,
+   "created_at": "2026-09-01T02:23:10.675Z",
+   "tarjeta_id": null,
+   "nro_operacion": "26545894",
+   "banco_o_metodo": "BCP Andrea",
+   "telegram_message_id": 1072,
+   "descripcion_original": "Transferencia entre mis cuentas"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-01",
+   "monto": 500,
+   "moneda": "S/.",
+   "cuenta_id": 2,
+   "created_at": "2026-09-01T12:27:52.888Z",
+   "tarjeta_id": null,
+   "nro_operacion": "060413",
+   "banco_o_metodo": "BCP Andrea",
+   "telegram_message_id": 1081,
+   "descripcion_original": "PLIN-ANDREA ZUÑIGA"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-02",
+   "monto": 15,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-09-02T23:31:33.951Z",
+   "tarjeta_id": null,
+   "nro_operacion": "094394",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1115,
+   "descripcion_original": "PLIN-PERCY TAYPE"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-03",
+   "monto": 7.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-03T19:30:04.273Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "624618918215",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 1118,
+   "descripcion_original": "Dlc Uber Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-04",
+   "monto": 8.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-04T18:16:17.756Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "624718908971",
+   "banco_o_metodo": "CMR Falabella Andrea",
+   "telegram_message_id": 1127,
+   "descripcion_original": "Dlc Uber Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-05",
+   "monto": 2.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-05T07:36:44.034Z",
+   "tarjeta_id": 2,
+   "nro_operacion": null,
+   "banco_o_metodo": "Tarjeta Interbank Jano",
+   "telegram_message_id": 1142,
+   "descripcion_original": "APPLE.COM/BILL"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-06",
+   "monto": 1.5,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-09-06T14:58:30.296Z",
+   "tarjeta_id": null,
+   "nro_operacion": "817147",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1147,
+   "descripcion_original": "SERVICIOS GENERALES CARAMBA S."
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-07",
+   "monto": 20.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-07T17:51:04.637Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "625017749671",
+   "banco_o_metodo": "CMR Falabella",
+   "telegram_message_id": 1151,
+   "descripcion_original": "Dlc Uber Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-09",
+   "monto": 1621.6,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-09T15:34:48.392Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "367993893900",
+   "banco_o_metodo": "CMR Falabella",
+   "telegram_message_id": 1187,
+   "descripcion_original": "BANCO FALABELLA"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-09",
+   "monto": 7,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-09-09T16:22:32.487Z",
+   "tarjeta_id": null,
+   "nro_operacion": "664144",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1191,
+   "descripcion_original": "PLIN-Fernando Alcides U"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-10",
+   "monto": 179.84,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-10T03:55:52.219Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "256540009468",
+   "banco_o_metodo": "CMR Falabella",
+   "telegram_message_id": 1198,
+   "descripcion_original": "Mobile Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-10",
+   "monto": 1,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-10T22:21:04.558Z",
+   "tarjeta_id": 5,
+   "nro_operacion": null,
+   "banco_o_metodo": "Tarjeta BBVA Andrea",
+   "telegram_message_id": 1210,
+   "descripcion_original": "PedidosYa*Plus"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-10",
+   "monto": 2.76,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-10T22:25:51.403Z",
+   "tarjeta_id": 5,
+   "nro_operacion": null,
+   "banco_o_metodo": "Tarjeta BBVA Andrea",
+   "telegram_message_id": 1211,
+   "descripcion_original": "DLC*RAPPI PERU"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-11",
+   "monto": 12,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-09-11T13:06:48.014Z",
+   "tarjeta_id": null,
+   "nro_operacion": "2505825",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1223,
+   "descripcion_original": "SERVICIOS GENERALES CARAMBA S."
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-14",
+   "monto": 11,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "created_at": "2026-09-14T19:53:30.997Z",
+   "tarjeta_id": null,
+   "nro_operacion": "1438080",
+   "banco_o_metodo": "BCP Jano",
+   "telegram_message_id": 1253,
+   "descripcion_original": "EL ENCUENTRO CRIOLLO GOURMET S."
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-16",
+   "monto": 50.68,
+   "moneda": "S/.",
+   "cuenta_id": 4,
+   "created_at": "2026-09-16T01:17:05.441Z",
+   "tarjeta_id": null,
+   "nro_operacion": "87AA9F964DBC",
+   "banco_o_metodo": "BBVA Andrea",
+   "telegram_message_id": 1276,
+   "descripcion_original": "Andrea Zuniga M"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-16",
+   "monto": 150,
+   "moneda": "S/.",
+   "cuenta_id": 2,
+   "created_at": "2026-09-16T01:17:55.905Z",
+   "tarjeta_id": null,
+   "nro_operacion": "27762234",
+   "banco_o_metodo": "BCP Andrea",
+   "telegram_message_id": 1277,
+   "descripcion_original": "Norma Qui"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-16",
+   "monto": 26.9,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-16T12:03:13.472Z",
+   "tarjeta_id": 1,
+   "nro_operacion": "625911755957",
+   "banco_o_metodo": "CMR Falabella",
+   "telegram_message_id": 1282,
+   "descripcion_original": "Dlc Uber Rides Lima Pe"
+  },
+  {
+   "fijo": "Variable",
+   "tipo": "GASTO",
+   "fecha": "2026-09-16",
+   "monto": 1239.08,
+   "moneda": "S/.",
+   "cuenta_id": null,
+   "created_at": "2026-09-16T21:58:50.751Z",
+   "tarjeta_id": 6,
+   "nro_operacion": "996262596612253P02921",
+   "banco_o_metodo": "Tarjeta Cencosud Andrea",
+   "telegram_message_id": 1287,
+   "descripcion_original": "Pago de Tarjeta de Credito"
+  }
+ ],
+ "estado_completo": {
+  "metas": [],
+  "cuentas": [
+   {
+    "id": 1,
+    "tipo": "Debito",
+    "nombre": "BCP Jano",
+    "titular": "Jano"
+   },
+   {
+    "id": 2,
+    "tipo": "Debito",
+    "nombre": "BCP Andrea",
+    "titular": "Andrea"
+   },
+   {
+    "id": 3,
+    "tipo": "Debito",
+    "nombre": "Interbank Jano",
+    "titular": "Jano"
+   },
+   {
+    "id": 4,
+    "tipo": "Debito",
+    "nombre": "BBVA Andrea",
+    "titular": "Andrea"
+   },
+   {
+    "id": 5,
+    "tipo": "Debito",
+    "nombre": "Interbank Andrea",
+    "titular": "Andrea"
+   }
+  ],
+  "tarjetas": [
+   {
+    "id": 1,
+    "tipo": "Credito",
+    "nombre": "CMR Falabella",
+    "titular": "Jano/Andrea"
+   },
+   {
+    "id": 2,
+    "tipo": "Credito",
+    "nombre": "Interbank Jano",
+    "titular": "Jano"
+   },
+   {
+    "id": 3,
+    "tipo": "Credito",
+    "nombre": "Interbank Andrea",
+    "titular": "Andrea"
+   },
+   {
+    "id": 5,
+    "tipo": "Credito",
+    "nombre": "Tarjeta BBVA",
+    "titular": "Andrea"
+   },
+   {
+    "id": 6,
+    "tipo": "Credito",
+    "nombre": "Cencosud",
+    "titular": "Andrea"
+   }
+  ],
+  "categorias": {
+   "Otros": {
+    "bg": "#F3F4F6",
+    "icon": "help-circle",
+    "color": "#6B7280"
+   },
+   "Salud": {
+    "bg": "#F5F3FF",
+    "icon": "heart-pulse",
+    "color": "#8B5CF6"
+   },
+   "Ahorro": {
+    "bg": "#FCE7F3",
+    "icon": "piggy-bank",
+    "color": "#EC4899"
+   },
+   "Comida": {
+    "bg": "#FEF3C7",
+    "icon": "utensils",
+    "color": "#F59E0B"
+   },
+   "Sueldo": {
+    "bg": "#ECFDF5",
+    "icon": "banknote",
+    "color": "#10B981"
+   },
+   "Mascotas": {
+    "bg": "#FCE7F3",
+    "icon": "paw-print",
+    "color": "#EC4899"
+   },
+   "Vivienda": {
+    "bg": "#F0FDFA",
+    "icon": "home",
+    "color": "#0D9488"
+   },
+   "Servicios": {
+    "bg": "#FFF1F2",
+    "icon": "lightbulb",
+    "color": "#EF4444"
+   },
+   "Educación": {
+    "bg": "#FDF4FF",
+    "icon": "graduation-cap",
+    "color": "#D946EF"
+   },
+   "Transporte": {
+    "bg": "#EFF6FF",
+    "icon": "car",
+    "color": "#3B82F6"
+   },
+   "Pago Tarjeta": {
+    "bg": "#EEF2FF",
+    "icon": "credit-card",
+    "color": "#6366F1"
+   },
+   "Deuda Inicial": {
+    "bg": "#FFF1F2",
+    "icon": "shield-alert",
+    "color": "#EF4444"
+   },
+   "Saldo Inicial": {
+    "bg": "#ECFDF5",
+    "icon": "wallet",
+    "color": "#10B981"
+   },
+   "Transferencia": {
+    "bg": "#F3F4F6",
+    "icon": "repeat",
+    "color": "#6B7280"
+   },
+   "Entretenimiento": {
+    "bg": "#F5F3FF",
+    "icon": "party-popper",
+    "color": "#8B5CF6"
+   }
+  },
+  "updated_at": "2026-09-16T22:33:57.832Z",
+  "presupuestos": [
+   {
+    "limite": 300,
+    "categoria": "Comida"
+   },
+   {
+    "limite": 200,
+    "categoria": "Transporte"
+   },
+   {
+    "limite": 450,
+    "categoria": "Servicios"
+   },
+   {
+    "limite": 200,
+    "categoria": "Entretenimiento"
+   },
+   {
+    "limite": 150,
+    "categoria": "Otros"
+   }
+  ],
+  "configuracion": {
+   "moneda": "S/.",
+   "formato_fecha": "DD/MM/YYYY",
+   "nombre_usuario": "Jano",
+   "tipo_cambio_usd": 3.4
+  },
+  "recordatorios": [
+   {
+    "id": 189,
+    "tipo": "Servicio",
+    "monto": 99,
+    "estado": "Pendiente",
+    "nombre": "Internet Claro",
+    "fecha_vencimiento": "2026-09-25"
+   },
+   {
+    "id": 190,
+    "tipo": "Tarjeta",
+    "monto": 2854.29,
+    "estado": "Pendiente",
+    "nombre": "Tarjeta CMR Falabella",
+    "tarjeta_id": 1,
+    "fecha_vencimiento": "2026-09-10"
+   },
+   {
+    "id": 191,
+    "tipo": "Tarjeta",
+    "monto": 442.8,
+    "estado": "Pendiente",
+    "nombre": "Tarjeta Interbank Jano (S/ 442.80 + $66.05 USD)",
+    "tarjeta_id": 2,
+    "fecha_vencimiento": "2026-09-15"
+   },
+   {
+    "id": 192,
+    "tipo": "Tarjeta",
+    "monto": 1041.65,
+    "estado": "Pendiente",
+    "nombre": "Tarjeta BBVA",
+    "tarjeta_id": 5,
+    "fecha_vencimiento": "2026-10-06"
+   },
+   {
+    "id": 165,
+    "tipo": "Tarjeta",
+    "monto": 50.62,
+    "estado": "Pagado",
+    "nombre": "Tarjeta Oh",
+    "tarjeta_id": 4,
+    "fecha_vencimiento": "2026-06-15"
+   },
+   {
+    "id": 166,
+    "tipo": "Tarjeta",
+    "monto": 854.2,
+    "estado": "Pendiente",
+    "nombre": "Tarjeta Interbank Andrea",
+    "tarjeta_id": 3,
+    "fecha_vencimiento": "2026-09-15"
+   },
+   {
+    "id": 167,
+    "tipo": "Servicio",
+    "monto": 1700,
+    "estado": "Pendiente",
+    "nombre": "Alquiler Casa",
+    "fecha_vencimiento": "2026-08-30"
+   },
+   {
+    "id": 9,
+    "tipo": "Servicio",
+    "monto": 250,
+    "estado": "Pendiente",
+    "nombre": "Mantenimiento Casa",
+    "fecha_vencimiento": "2026-09-30"
+   }
+  ],
+  "trabajos_pendientes": [
+   {
+    "id": 182,
+    "monto": 500,
+    "estado": "Cobrado",
+    "cliente": "Iqoniqe",
+    "cuenta_id": 1,
+    "descripcion": "Evento Hyundai",
+    "fecha_cobro": "2026-06-05",
+    "fecha_emision": "2026-05-13"
+   },
+   {
+    "id": 184,
+    "monto": 450,
+    "estado": "Cobrado",
+    "cliente": "Doomo Saltado",
+    "cuenta_id": 1,
+    "descripcion": "Clase de cerámica",
+    "fecha_cobro": "2026-06-01",
+    "fecha_emision": "2026-05-07"
+   },
+   {
+    "id": 187,
+    "monto": 1040,
+    "estado": "Cobrado",
+    "cliente": "Xpressa",
+    "cuenta_id": 1,
+    "descripcion": "Marcobre 1",
+    "fecha_cobro": "2026-06-03",
+    "fecha_emision": "2026-05-30"
+   },
+   {
+    "id": 183,
+    "monto": 300,
+    "estado": "Cobrado",
+    "cliente": "Goodaidia",
+    "cuenta_id": 1,
+    "descripcion": "Pirka",
+    "fecha_cobro": "2026-06-09",
+    "fecha_emision": "2026-04-10"
+   },
+   {
+    "id": 288,
+    "monto": 200,
+    "estado": "Cobrado",
+    "cliente": "Goodaidia",
+    "cuenta_id": 1,
+    "descripcion": "Pirka",
+    "fecha_cobro": "2026-06-27",
+    "fecha_emision": "2026-04-10"
+   },
+   {
+    "id": 289,
+    "monto": 500,
+    "estado": "Pendiente",
+    "cliente": "Goodaidia",
+    "cuenta_id": null,
+    "descripcion": "Pirka",
+    "fecha_cobro": null,
+    "fecha_emision": "2026-04-10"
+   },
+   {
+    "id": 290,
+    "monto": 1200,
+    "estado": "Pendiente",
+    "cliente": "Xpressa",
+    "cuenta_id": null,
+    "descripcion": "Antamina Oficinas",
+    "fecha_cobro": null,
+    "fecha_emision": "2026-05-23"
+   },
+   {
+    "id": 291,
+    "monto": 600,
+    "estado": "Pendiente",
+    "cliente": "Xpressa",
+    "cuenta_id": null,
+    "descripcion": "DP World Junio",
+    "fecha_cobro": null,
+    "fecha_emision": "2026-06-03"
+   },
+   {
+    "id": 292,
+    "monto": 1200,
+    "estado": "Pendiente",
+    "cliente": "Iqoniqe",
+    "cuenta_id": null,
+    "descripcion": "Hyundai",
+    "fecha_cobro": null,
+    "fecha_emision": "2026-05-20"
+   }
+  ],
+  "transacciones_pendientes": [
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-20",
+    "monto": 133.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-20T22:40:03.603Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "623222025969",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 897,
+    "descripcion_original": "Dlc Pedidosya Edo Sushi Blima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-21",
+    "monto": 1,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-21T00:13:47.727Z",
+    "tarjeta_id": 2,
+    "nro_operacion": null,
+    "banco_o_metodo": "Tarjeta Interbank Jano",
+    "telegram_message_id": 901,
+    "descripcion_original": "DLC*TEMU PE"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-21",
+    "monto": 1,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-08-21T00:40:32.847Z",
+    "tarjeta_id": null,
+    "nro_operacion": "430805",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 904,
+    "descripcion_original": "DLC*TEMU PE"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-21",
+    "monto": 10.1,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-21T03:21:51.784Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "623303750377",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 926,
+    "descripcion_original": "Dlc Uber Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-21",
+    "monto": 50,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-21T16:19:04.233Z",
+    "tarjeta_id": null,
+    "nro_operacion": "LP0365903900010",
+    "banco_o_metodo": "Tarjeta Visa Andrea",
+    "telegram_message_id": 927,
+    "descripcion_original": "ELIDA ROCIO CAPARACHIN TORREJON"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-27",
+    "monto": 95,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-27T01:12:23.654Z",
+    "tarjeta_id": null,
+    "nro_operacion": "AP4619974",
+    "banco_o_metodo": "Tarjeta Visa Andrea",
+    "telegram_message_id": 994,
+    "descripcion_original": "CGH WEB"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "INGRESO",
+    "fecha": "2026-08-27",
+    "monto": 1101.26,
+    "moneda": "US$",
+    "cuenta_id": 2,
+    "created_at": "2026-08-27T21:47:04.671Z",
+    "tarjeta_id": null,
+    "nro_operacion": "AF533895",
+    "banco_o_metodo": "BCP Andrea",
+    "telegram_message_id": 999,
+    "descripcion_original": "Transferencia del exterior de GLOBO LANGUAGE SOLUTIONS LLC"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-28",
+    "monto": 35.5,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-08-28T03:06:10.962Z",
+    "tarjeta_id": null,
+    "nro_operacion": "642543",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1002,
+    "descripcion_original": "PLIN-EIJI JUNIOR LAY"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-28",
+    "monto": 14.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-28T14:53:57.596Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "624014810787",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 1006,
+    "descripcion_original": "Pyu Uber Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-28",
+    "monto": 14.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-28T14:54:01.238Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "624014287682",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 1007,
+    "descripcion_original": "Dlc Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-28",
+    "monto": 9.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-08-28T17:58:54.549Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "624017897976",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 1011,
+    "descripcion_original": "Pyu Uber Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-08-28",
+    "monto": 14,
+    "moneda": "S/.",
+    "cuenta_id": 2,
+    "created_at": "2026-08-28T19:51:53.556Z",
+    "tarjeta_id": null,
+    "nro_operacion": "18445040",
+    "banco_o_metodo": "BCP Andrea",
+    "telegram_message_id": 1037,
+    "descripcion_original": "Luz Cam"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-01",
+    "monto": 1640.52,
+    "moneda": "S/.",
+    "cuenta_id": 2,
+    "created_at": "2026-09-01T02:23:10.675Z",
+    "tarjeta_id": null,
+    "nro_operacion": "26545894",
+    "banco_o_metodo": "BCP Andrea",
+    "telegram_message_id": 1072,
+    "descripcion_original": "Transferencia entre mis cuentas"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-01",
+    "monto": 500,
+    "moneda": "S/.",
+    "cuenta_id": 2,
+    "created_at": "2026-09-01T12:27:52.888Z",
+    "tarjeta_id": null,
+    "nro_operacion": "060413",
+    "banco_o_metodo": "BCP Andrea",
+    "telegram_message_id": 1081,
+    "descripcion_original": "PLIN-ANDREA ZUÑIGA"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-02",
+    "monto": 15,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-09-02T23:31:33.951Z",
+    "tarjeta_id": null,
+    "nro_operacion": "094394",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1115,
+    "descripcion_original": "PLIN-PERCY TAYPE"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-03",
+    "monto": 7.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-03T19:30:04.273Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "624618918215",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 1118,
+    "descripcion_original": "Dlc Uber Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-04",
+    "monto": 8.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-04T18:16:17.756Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "624718908971",
+    "banco_o_metodo": "CMR Falabella Andrea",
+    "telegram_message_id": 1127,
+    "descripcion_original": "Dlc Uber Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-05",
+    "monto": 2.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-05T07:36:44.034Z",
+    "tarjeta_id": 2,
+    "nro_operacion": null,
+    "banco_o_metodo": "Tarjeta Interbank Jano",
+    "telegram_message_id": 1142,
+    "descripcion_original": "APPLE.COM/BILL"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-06",
+    "monto": 1.5,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-09-06T14:58:30.296Z",
+    "tarjeta_id": null,
+    "nro_operacion": "817147",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1147,
+    "descripcion_original": "SERVICIOS GENERALES CARAMBA S."
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-07",
+    "monto": 20.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-07T17:51:04.637Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "625017749671",
+    "banco_o_metodo": "CMR Falabella",
+    "telegram_message_id": 1151,
+    "descripcion_original": "Dlc Uber Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-09",
+    "monto": 1621.6,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-09T15:34:48.392Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "367993893900",
+    "banco_o_metodo": "CMR Falabella",
+    "telegram_message_id": 1187,
+    "descripcion_original": "BANCO FALABELLA"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-09",
+    "monto": 7,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-09-09T16:22:32.487Z",
+    "tarjeta_id": null,
+    "nro_operacion": "664144",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1191,
+    "descripcion_original": "PLIN-Fernando Alcides U"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-10",
+    "monto": 179.84,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-10T03:55:52.219Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "256540009468",
+    "banco_o_metodo": "CMR Falabella",
+    "telegram_message_id": 1198,
+    "descripcion_original": "Mobile Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-10",
+    "monto": 1,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-10T22:21:04.558Z",
+    "tarjeta_id": 5,
+    "nro_operacion": null,
+    "banco_o_metodo": "Tarjeta BBVA Andrea",
+    "telegram_message_id": 1210,
+    "descripcion_original": "PedidosYa*Plus"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-10",
+    "monto": 2.76,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-10T22:25:51.403Z",
+    "tarjeta_id": 5,
+    "nro_operacion": null,
+    "banco_o_metodo": "Tarjeta BBVA Andrea",
+    "telegram_message_id": 1211,
+    "descripcion_original": "DLC*RAPPI PERU"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-11",
+    "monto": 12,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-09-11T13:06:48.014Z",
+    "tarjeta_id": null,
+    "nro_operacion": "2505825",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1223,
+    "descripcion_original": "SERVICIOS GENERALES CARAMBA S."
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-14",
+    "monto": 11,
+    "moneda": "S/.",
+    "cuenta_id": 1,
+    "created_at": "2026-09-14T19:53:30.997Z",
+    "tarjeta_id": null,
+    "nro_operacion": "1438080",
+    "banco_o_metodo": "BCP Jano",
+    "telegram_message_id": 1253,
+    "descripcion_original": "EL ENCUENTRO CRIOLLO GOURMET S."
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-16",
+    "monto": 50.68,
+    "moneda": "S/.",
+    "cuenta_id": 4,
+    "created_at": "2026-09-16T01:17:05.441Z",
+    "tarjeta_id": null,
+    "nro_operacion": "87AA9F964DBC",
+    "banco_o_metodo": "BBVA Andrea",
+    "telegram_message_id": 1276,
+    "descripcion_original": "Andrea Zuniga M"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-16",
+    "monto": 150,
+    "moneda": "S/.",
+    "cuenta_id": 2,
+    "created_at": "2026-09-16T01:17:55.905Z",
+    "tarjeta_id": null,
+    "nro_operacion": "27762234",
+    "banco_o_metodo": "BCP Andrea",
+    "telegram_message_id": 1277,
+    "descripcion_original": "Norma Qui"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-16",
+    "monto": 26.9,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-16T12:03:13.472Z",
+    "tarjeta_id": 1,
+    "nro_operacion": "625911755957",
+    "banco_o_metodo": "CMR Falabella",
+    "telegram_message_id": 1282,
+    "descripcion_original": "Dlc Uber Rides Lima Pe"
+   },
+   {
+    "fijo": "Variable",
+    "tipo": "GASTO",
+    "fecha": "2026-09-16",
+    "monto": 1239.08,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "created_at": "2026-09-16T21:58:50.751Z",
+    "tarjeta_id": 6,
+    "nro_operacion": "996262596612253P02921",
+    "banco_o_metodo": "Tarjeta Cencosud Andrea",
+    "telegram_message_id": 1287,
+    "descripcion_original": "Pago de Tarjeta de Credito"
+   }
+  ]
+ }
+}

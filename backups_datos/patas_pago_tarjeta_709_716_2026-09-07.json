@@ -1,0 +1,38 @@
+[
+ {
+  "id": 709,
+  "fecha": "2026-09-04",
+  "tipo": "GASTO",
+  "categoria": "Pago Tarjeta",
+  "descripcion": "Pago parcial tarjeta Interbank Jano",
+  "monto": 26.77,
+  "moneda": "US$",
+  "cuenta_id": null,
+  "tarjeta_id": null,
+  "fijo": "Variable",
+  "nro_operacion": "0428726",
+  "transfer_id": 709,
+  "banco_o_metodo": "Tarjeta Interbank Jano",
+  "descripcion_original": "Constancia de pago",
+  "telegram_message_id": 1125,
+  "created_at": "2026-09-04T17:39:31.255+00:00"
+ },
+ {
+  "id": 716,
+  "fecha": "2026-09-05",
+  "tipo": "GASTO",
+  "categoria": "Pago Tarjeta",
+  "descripcion": "Pago parcial tarjeta de crédito Interbank",
+  "monto": 50,
+  "moneda": "S/.",
+  "cuenta_id": null,
+  "tarjeta_id": null,
+  "fijo": "Variable",
+  "nro_operacion": "0220223",
+  "transfer_id": 716,
+  "banco_o_metodo": "Tarjeta Interbank Jano",
+  "descripcion_original": "Pago con Tarjeta de crédito Visa",
+  "telegram_message_id": 1143,
+  "created_at": "2026-09-05T15:11:42.815+00:00"
+ }
+]

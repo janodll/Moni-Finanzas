@@ -1,0 +1,167 @@
+{
+ "fecha": "2026-09-16",
+ "saldos_antes_del_cuadre": [
+  {
+   "cuenta_id": 1,
+   "cuenta": "BCP Jano",
+   "moneda": "S/.",
+   "saldo_moni": 447.35,
+   "saldo_real": 165.0
+  },
+  {
+   "cuenta_id": 3,
+   "cuenta": "Interbank Jano",
+   "moneda": "S/.",
+   "saldo_moni": 118.69,
+   "saldo_real": 105.9
+  },
+  {
+   "cuenta_id": 3,
+   "cuenta": "Interbank Jano",
+   "moneda": "US$",
+   "saldo_moni": 0.0,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 2,
+   "cuenta": "BCP Andrea",
+   "moneda": "S/.",
+   "saldo_moni": -3222.08,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 2,
+   "cuenta": "BCP Andrea",
+   "moneda": "US$",
+   "saldo_moni": 903.71,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 4,
+   "cuenta": "BBVA Andrea",
+   "moneda": "S/.",
+   "saldo_moni": -315.43,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 4,
+   "cuenta": "BBVA Andrea",
+   "moneda": "US$",
+   "saldo_moni": 0,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 5,
+   "cuenta": "Interbank Andrea",
+   "moneda": "S/.",
+   "saldo_moni": -7.52,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 5,
+   "cuenta": "Interbank Andrea",
+   "moneda": "US$",
+   "saldo_moni": 0,
+   "saldo_real": 0.0
+  },
+  {
+   "cuenta_id": 1,
+   "cuenta": "BCP Jano",
+   "moneda": "US$",
+   "saldo_moni": 0,
+   "saldo_real": 0.0
+  }
+ ],
+ "ajustes": [
+  {
+   "fecha": "2026-09-16",
+   "tipo": "GASTO",
+   "categoria": "Saldo Inicial",
+   "monto": 282.35,
+   "moneda": "S/.",
+   "cuenta_id": 1,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - BCP Jano",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  },
+  {
+   "fecha": "2026-09-16",
+   "tipo": "GASTO",
+   "categoria": "Saldo Inicial",
+   "monto": 12.79,
+   "moneda": "S/.",
+   "cuenta_id": 3,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - Interbank Jano",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  },
+  {
+   "fecha": "2026-09-16",
+   "tipo": "INGRESO",
+   "categoria": "Saldo Inicial",
+   "monto": 3222.08,
+   "moneda": "S/.",
+   "cuenta_id": 2,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - BCP Andrea",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  },
+  {
+   "fecha": "2026-09-16",
+   "tipo": "GASTO",
+   "categoria": "Saldo Inicial",
+   "monto": 903.71,
+   "moneda": "US$",
+   "cuenta_id": 2,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - BCP Andrea dólares",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  },
+  {
+   "fecha": "2026-09-16",
+   "tipo": "INGRESO",
+   "categoria": "Saldo Inicial",
+   "monto": 315.43,
+   "moneda": "S/.",
+   "cuenta_id": 4,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - BBVA Andrea",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  },
+  {
+   "fecha": "2026-09-16",
+   "tipo": "INGRESO",
+   "categoria": "Saldo Inicial",
+   "monto": 7.52,
+   "moneda": "S/.",
+   "cuenta_id": 5,
+   "tarjeta_id": null,
+   "fijo": "Variable",
+   "nro_operacion": null,
+   "banco_o_metodo": null,
+   "descripcion": "Ajuste de conciliación (saldo real) - Interbank Andrea",
+   "descripcion_original": null,
+   "created_at": "2026-09-16T23:24:27.431Z"
+  }
+ ]
+}

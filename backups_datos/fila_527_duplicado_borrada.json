@@ -1,0 +1,20 @@
+[
+  {
+    "id": 527,
+    "fecha": "2026-08-06",
+    "tipo": "GASTO",
+    "categoria": "Transferencia",
+    "descripcion": "Transferencia a Andrea (Zuniga Martinez-de-pinillos A.)",
+    "monto": 2500,
+    "moneda": "S/.",
+    "cuenta_id": null,
+    "tarjeta_id": null,
+    "fijo": "Variable",
+    "nro_operacion": "05628745",
+    "transfer_id": null,
+    "banco_o_metodo": "Tarjeta BCP Jano",
+    "descripcion_original": "Zuniga Martinez-de-pinillos A.",
+    "telegram_message_id": 617,
+    "created_at": "2026-08-06T00:04:45.207+00:00"
+  }
+]
