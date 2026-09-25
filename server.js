@@ -857,7 +857,7 @@ async function handleAutoRegister(req, res) {
     return res.json({ ok: true, message: "Transacción duplicada por similitud ignorada.", duplicate: true });
   }
 
-  const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud'].some(keyword =>
+  const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud', 'sip'].some(keyword =>
     banco_o_metodo.toLowerCase().includes(keyword)
   );
   const { cuenta_id, tarjeta_id } = resolveAccountOrCard(banco_o_metodo, isCreditCard, state);

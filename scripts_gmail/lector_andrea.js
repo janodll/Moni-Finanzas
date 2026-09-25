@@ -45,7 +45,7 @@ function fetchGeminiConFallback(payload) {
 
 function procesarCorreosMoniAndrea() {
   // Busca correos no leídos de los bancos
-  const query = 'is:unread newer_than:1d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank OR cencosud)';
+  const query = 'is:unread newer_than:1d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank OR cencosud OR sip)';
   const hilos = GmailApp.search(query, 0, 10);
   
   if (hilos.length === 0) {
@@ -96,6 +96,7 @@ REGLA DE ORO PARA EL BANCO_O_METODO:
 PASO 1 — EXCEPCIONES. Revísalas ANTES que nada. Si alguna aplica, usa el valor EXACTO indicado y no le agregues ni le quites nada (ni el nombre de la persona, ni la palabra "Tarjeta"):
 - Falabella o CMR, en cualquier forma que aparezca -> exactamente: CMR Falabella
 - Cencosud, en cualquier forma -> exactamente: Tarjeta Cencosud Andrea
+- SIP, en cualquier forma -> exactamente: SIP Andrea. Es tarjeta de credito.
 - BCP, en cualquier forma -> exactamente: BCP Andrea. No existe ninguna tarjeta de crédito BCP; aunque el correo diga "tarjeta", es débito.
 
 PASO 2 — Solo si NO aplicó ninguna excepción del PASO 1: deduce el banco y agrégale "Andrea" al final. CRÍTICO — distingue TARJETA DE CRÉDITO vs CUENTA/DÉBITO, porque un mismo banco puede tener ambas:

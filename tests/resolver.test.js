@@ -17,7 +17,8 @@ const state = {
     { id: 2, nombre: 'Interbank Jano', titular: 'Jano' },
     { id: 3, nombre: 'Interbank Andrea', titular: 'Andrea' },
     { id: 5, nombre: 'Tarjeta BBVA', titular: 'Andrea' },
-    { id: 6, nombre: 'Cencosud', titular: 'Andrea' }
+    { id: 6, nombre: 'Cencosud', titular: 'Andrea' },
+    { id: 7, nombre: 'SIP Andrea', titular: 'Andrea' }
   ]
 };
 
@@ -77,6 +78,24 @@ test('un banco que de verdad no existe sigue devolviendo null (no se inventa cue
   );
   assert.deepStrictEqual(
     resolveAccountOrCard('', false, state),
+    { cuenta_id: null, tarjeta_id: null }
+  );
+});
+
+test('la tarjeta SIP de Andrea se reconoce escrita de varias formas', () => {
+  const casos = ['SIP Andrea', 'Tarjeta SIP Andrea', 'sip andrea', 'Tarjeta SIP'];
+  for (const banco of casos) {
+    assert.deepStrictEqual(
+      resolveAccountOrCard(banco, esTarjetaCredito(banco), state),
+      { cuenta_id: null, tarjeta_id: 7 }, banco
+    );
+  }
+});
+
+test('una palabra que contenga "sip" no manda el gasto a la tarjeta SIP', () => {
+  // "Sipan" contiene sip: no debe calzar. Sin tarjeta ni cuenta que corresponda, da null.
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Restaurante Sipan', false, state),
     { cuenta_id: null, tarjeta_id: null }
   );
 });

@@ -24,7 +24,10 @@ export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
     return true;
   };
 
-  if (isCreditCard || query.includes('tarjeta') || query.includes('cmr') || query.includes('falabella')) {
+  // \bsip\b y no includes('sip'): evita que una palabra que lo contenga (un nombre
+  // propio, por ejemplo) mande el gasto a la tarjeta equivocada.
+  const nombraSip = /\bsip\b/.test(query);
+  if (isCreditCard || query.includes('tarjeta') || query.includes('cmr') || query.includes('falabella') || nombraSip) {
     // Buscar en tarjetas (respetando la persona)
     for (const t of state.tarjetas || []) {
       const name = t.nombre.toLowerCase();
@@ -33,7 +36,8 @@ export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
           (query.includes('cmr') && name.includes('falabella')) ||
           (query.includes('falabella') && name.includes('cmr')) ||
           (query.includes('bbva') && name.includes('bbva')) ||
-          (query.includes('interbank') && name.includes('interbank'));
+          (query.includes('interbank') && name.includes('interbank')) ||
+          (nombraSip && name.includes('sip'));
       if (matchesBank && personOk(name)) {
         return { cuenta_id: null, tarjeta_id: t.id };
       }
@@ -49,6 +53,10 @@ export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
     }
     if (query.includes('interbank')) {
       const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('interbank') && personOk(t.nombre.toLowerCase()));
+      if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
+    }
+    if (nombraSip) {
+      const defaultCard = (state.tarjetas || []).find(t => t.nombre.toLowerCase().includes('sip') && personOk(t.nombre.toLowerCase()));
       if (defaultCard) return { cuenta_id: null, tarjeta_id: defaultCard.id };
     }
     if (query.includes('cencosud')) {
