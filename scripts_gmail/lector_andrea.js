@@ -88,8 +88,16 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
   "moneda": "S/." o "US$",
   "banco_o_metodo": "<Nombre del banco> Andrea",
   "descripcion_original": "<A quién se pagó o detalle>",
-  "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>"
+  "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>",
+  "cuota_actual": <número de cuota que se está cobrando, o null>,
+  "cuota_total": <cantidad total de cuotas del plan, o null>
 }
+
+REGLA DE CUOTAS: Muchos cargos de tarjeta vienen en cuotas y el correo lo dice, con formas como "Cuota 7/12", "cuota 7 de 12", "3/6" o "en 12 cuotas sin intereses".
+- Si aparecen los DOS números (cuál cuota y cuántas son), ponlos en "cuota_actual" y "cuota_total".
+- Si solo dice el total y no cuál cuota es (ej: "pagas en 12 cuotas"), pon "cuota_total": 12 y "cuota_actual": null.
+- Si el correo NO habla de cuotas, los dos van en null.
+NUNCA cambies el "monto" por esto: va siempre el importe que el correo dice que se cobró. No lo dividas entre las cuotas ni lo multipliques.
 
 REGLA DE ORO PARA EL BANCO_O_METODO:
 

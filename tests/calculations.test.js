@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { addOneMonth, formatDateStr, calculateBalances, getMontoEnSoles } from '../public/js/calculations.js';
+import { addOneMonth, formatDateStr, calculateBalances, getMontoEnSoles, mesesTranscurridos, calcularCuotas } from '../public/js/calculations.js';
 
 test('addOneMonth() date rollover tests', () => {
   // Test basic rollover
@@ -102,4 +102,125 @@ test('calculateBalances() with USD transactions', () => {
   assert.strictEqual(result.balanceGeneral, 860);       // 960 - 100
   assert.strictEqual(result.egresosMes, 140);           // 40 + 100
   assert.strictEqual(result.gastosPorCategoriaEsteMes['Comida'], 40);
+});
+
+// ===========================================================================
+// CUOTAS
+// ===========================================================================
+
+test('mesesTranscurridos() no cuenta el mes hasta que se cumple el día', () => {
+  assert.strictEqual(mesesTranscurridos('2026-07-22', '2026-08-21'), 0);
+  assert.strictEqual(mesesTranscurridos('2026-07-22', '2026-08-22'), 1);
+  assert.strictEqual(mesesTranscurridos('2026-07-22', '2026-09-28'), 2);
+  assert.strictEqual(mesesTranscurridos('2026-12-15', '2027-03-15'), 3);
+  assert.strictEqual(mesesTranscurridos('2026-09-01', '2026-08-01'), 0); // nunca negativo
+});
+
+test('calcularCuotas() caso A: un solo cargo por el total (la moto)', () => {
+  // Cencosud cobró S/ 6,995 de golpe el 22/07 y la moto está en 12 cuotas.
+  const txs = [
+    { id: 1, fecha: '2026-07-22', tipo: 'GASTO', monto: 6995, tarjeta_id: 6,
+      descripcion: 'Compra de Moto', cuota_total: 12, cuota_actual: null }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-28');
+
+  // 6995 / 12 = 582.9166...
+  assert.ok(Math.abs(r.cuotaMensual - 582.9166) < 0.01);
+  // Al 28/09 pasaron 2 meses: quedan 10 cuotas.
+  assert.strictEqual(r.detalle[0].pagadas, 2);
+  assert.strictEqual(r.detalle[0].restantes, 10);
+  // El total ya está dentro de la deuda de la tarjeta.
+  assert.ok(Math.abs(r.saldoEnDeuda - 5829.1666) < 0.01);
+  assert.strictEqual(r.comprometidoFuturo, 0);
+});
+
+test('calcularCuotas() caso B: el banco cobra una cuota por mes', () => {
+  // Interbank cobró "Mercado Pago (Cuota 7/12)" de S/ 240.75 el 19/06.
+  const txs = [
+    { id: 2, fecha: '2026-06-19', tipo: 'GASTO', monto: 240.75, tarjeta_id: 3,
+      descripcion: 'Mercado Pago', cuota_actual: 7, cuota_total: 12 }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-28');
+
+  assert.strictEqual(r.cuotaMensual, 240.75);
+  // Pasaron 3 meses desde la cuota 7, así que va por la 10: quedan 2.
+  assert.strictEqual(r.detalle[0].pagadas, 10);
+  assert.strictEqual(r.detalle[0].restantes, 2);
+  // Lo que falta todavía NO está cargado en la tarjeta.
+  assert.strictEqual(r.saldoEnDeuda, 0);
+  assert.ok(Math.abs(r.comprometidoFuturo - 481.50) < 0.01);
+});
+
+test('calcularCuotas() no cuenta dos veces la misma compra del caso B', () => {
+  // El lector leyó el correo de la cuota 7 y el de la 8. Es UNA compra.
+  const txs = [
+    { id: 3, fecha: '2026-06-19', tipo: 'GASTO', monto: 240.75, tarjeta_id: 3,
+      descripcion_original: 'Mercado Pago', cuota_actual: 7, cuota_total: 12 },
+    { id: 4, fecha: '2026-07-19', tipo: 'GASTO', monto: 240.75, tarjeta_id: 3,
+      descripcion_original: 'Mercado Pago', cuota_actual: 8, cuota_total: 12 }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-28');
+
+  assert.strictEqual(r.detalle.length, 1);
+  assert.strictEqual(r.cuotaMensual, 240.75); // no 481.50
+  // Se usa la fila más adelantada (cuota 8, del 19/07): +2 meses = va por la 10.
+  assert.strictEqual(r.detalle[0].pagadas, 10);
+});
+
+test('calcularCuotas() ignora las cuotas que ya terminaron', () => {
+  const txs = [
+    // Mercadolibre iba en la 6 de 6 en junio: terminada.
+    { id: 5, fecha: '2026-06-19', tipo: 'GASTO', monto: 299.85, tarjeta_id: 3,
+      descripcion: 'Mercadolibre', cuota_actual: 6, cuota_total: 6 },
+    // Club Oferta iba en la 4 de 6 en junio: al 28/09 ya pasaron 3 meses.
+    { id: 6, fecha: '2026-06-19', tipo: 'GASTO', monto: 86.50, tarjeta_id: 3,
+      descripcion: 'Club Oferta', cuota_actual: 4, cuota_total: 6 }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-28');
+
+  assert.strictEqual(r.detalle.length, 0);
+  assert.strictEqual(r.cuotaMensual, 0);
+});
+
+test('calcularCuotas() convierte las cuotas en dólares a soles', () => {
+  const txs = [
+    { id: 7, fecha: '2026-08-10', tipo: 'GASTO', monto: 100, moneda: 'US$', tarjeta_id: 2,
+      descripcion: 'Compra internacional', cuota_actual: 1, cuota_total: 6 }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-10');
+
+  assert.strictEqual(r.cuotaMensual, 340); // 100 USD * 3.4
+});
+
+test('calcularCuotas() ignora transacciones sin cuotas y los pagos', () => {
+  const txs = [
+    { id: 8, fecha: '2026-09-01', tipo: 'GASTO', monto: 50, tarjeta_id: 1, descripcion: 'Almuerzo' },
+    { id: 9, fecha: '2026-09-01', tipo: 'GASTO', monto: 50, tarjeta_id: 1, cuota_total: 1 },
+    { id: 10, fecha: '2026-09-02', tipo: 'INGRESO', monto: 500, tarjeta_id: 1, cuota_total: 12 }
+  ];
+  const r = calcularCuotas(txs, 3.4, '2026-09-28');
+  assert.strictEqual(r.detalle.length, 0);
+});
+
+test('calculateBalances() separa el consumo rotativo de la deuda en cuotas', () => {
+  const mockState = {
+    cuentas: [{ id: 1, nombre: 'BCP', tipo: 'Debito' }],
+    tarjetas: [{ id: 6, nombre: 'Cencosud', tipo: 'Credito' }],
+    configuracion: { tipo_cambio_usd: 3.4 },
+    transacciones: [
+      // La moto: 12 cuotas, cargada entera.
+      { id: 1, fecha: '2026-07-22', tipo: 'GASTO', monto: 6995, categoria: 'Transporte',
+        cuenta_id: null, tarjeta_id: 6, cuota_total: 12, cuota_actual: null },
+      // Compras normales del mes en la misma tarjeta.
+      { id: 2, fecha: '2026-09-26', tipo: 'GASTO', monto: 142.04, categoria: 'Comida',
+        cuenta_id: null, tarjeta_id: 6 }
+    ]
+  };
+  const r = calculateBalances(mockState, '2026-09', '2026-09-28');
+
+  assert.ok(Math.abs(r.sumaDeudas - 7137.04) < 0.01);
+  // De esa deuda, 10 cuotas de 582.92 siguen comprometidas...
+  assert.ok(Math.abs(r.cuotas.saldoEnDeuda - 5829.1666) < 0.01);
+  // ...y el resto es consumo que se paga solo el mes que viene.
+  assert.ok(Math.abs(r.consumoRotativo - 1307.8733) < 0.01);
 });

@@ -2241,3 +2241,50 @@ body {
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* Desglose de la deuda de tarjetas: cuotas comprometidas vs consumo del ciclo.
+   Sin esto el dashboard muestra un solo número grande y el consumo normal del
+   mes se lee como si fuera deuda. */
+.deuda-split {
+  border-bottom: 1px solid var(--border-color, #eee);
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+}
+
+.deuda-split-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+}
+
+.deuda-split-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.deuda-split-label small {
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.deuda-split-val {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-main);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.deuda-split-cuota {
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border-color, #eee);
+}
+
+.deuda-split-cuota .deuda-split-label,
+.deuda-split-cuota .deuda-split-val {
+  font-weight: 700;
+  color: var(--text-main);
+}

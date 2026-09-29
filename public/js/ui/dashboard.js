@@ -29,6 +29,51 @@ export function renderTotals(balances) {
   document.getElementById("sub-ahorro").innerText = `${mon} ${formatNumber(Math.max(0, ahorroMonto))} de excedente este mes`;
 }
 
+// Desglosa la deuda de tarjetas en cuotas comprometidas y consumo del ciclo.
+// Son dos cosas distintas: las cuotas se arrastran meses, el consumo se paga
+// solo el mes que viene. Juntarlas en un número hace que un mes normal parezca
+// una deuda enorme. Si no hay ninguna compra en cuotas, el bloque no se muestra.
+function renderDeudaSplit(balances, mon) {
+  const cont = document.getElementById("dash-deuda-split");
+  if (!cont) return;
+
+  const cuotas = balances.cuotas || { detalle: [], cuotaMensual: 0, saldoEnDeuda: 0, comprometidoFuturo: 0 };
+  if (!cuotas.detalle.length) {
+    cont.style.display = "none";
+    return;
+  }
+
+  const compras = cuotas.detalle.length;
+  const faltan = Math.max(...cuotas.detalle.map(d => d.restantes));
+  const pendienteTotal = cuotas.saldoEnDeuda + cuotas.comprometidoFuturo;
+
+  const filas = [
+    {
+      label: "En cuotas",
+      sub: `${compras} ${compras === 1 ? "compra" : "compras"} · la última termina en ${faltan} ${faltan === 1 ? "mes" : "meses"}`,
+      val: pendienteTotal
+    },
+    {
+      label: "Consumo del ciclo",
+      sub: "se paga completo el mes que viene",
+      val: balances.consumoRotativo || 0
+    }
+  ];
+
+  cont.innerHTML = filas.map(f => `
+    <div class="deuda-split-row">
+      <span class="deuda-split-label">${f.label}<br><small>${f.sub}</small></span>
+      <span class="deuda-split-val">${mon} ${formatNumber(f.val)}</span>
+    </div>
+  `).join("") + `
+    <div class="deuda-split-row deuda-split-cuota">
+      <span class="deuda-split-label">Cuota mensual comprometida</span>
+      <span class="deuda-split-val">${mon} ${formatNumber(cuotas.cuotaMensual)}</span>
+    </div>
+  `;
+  cont.style.display = "block";
+}
+
 // Renderiza listas de cuentas y tarjetas
 export function renderDashboardLists(balances) {
   const mon = state.configuracion.moneda || "S/.";
@@ -43,6 +88,8 @@ export function renderDashboardLists(balances) {
   if (totalTarjetasHeader) {
     totalTarjetasHeader.innerText = `${mon} ${formatNumber(balances.sumaDeudas)}`;
   }
+
+  renderDeudaSplit(balances, mon);
 
   // 1. Cuentas Débito
   const accountsContainer = document.getElementById("dash-accounts-list");

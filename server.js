@@ -805,7 +805,9 @@ async function handleAutoRegister(req, res) {
     nro_operacion,
     descripcion_original,
     categoria,
-    descripcion
+    descripcion,
+    cuota_actual,
+    cuota_total
   } = req.body;
 
   if (!monto || !banco_o_metodo) {
@@ -876,6 +878,16 @@ async function handleAutoRegister(req, res) {
     created_at: new Date().toISOString()
   };
 
+  // Compras en cuotas: el correo del banco trae "Cuota 7/12" y hasta ahora se
+  // perdía, así que Moni veía el cargo del mes como una compra suelta y no sabía
+  // cuánto quedaba comprometido. Solo se guarda si el plan tiene 2 cuotas o más.
+  const cuotaTotalNum = parseInt(cuota_total, 10);
+  if (cuotaTotalNum >= 2) {
+    newTx.cuota_total = cuotaTotalNum;
+    const cuotaActualNum = parseInt(cuota_actual, 10);
+    newTx.cuota_actual = cuotaActualNum >= 1 ? cuotaActualNum : null;
+  }
+
   // Si ya tiene categoría y descripción final estructurada
   if (categoria && descripcion) {
     newTx.categoria = categoria;
@@ -887,7 +899,10 @@ async function handleAutoRegister(req, res) {
     return res.json({ ok: true, registered: true, data: saved });
   } else {
     // Enviar mensaje a Telegram primero para obtener su message_id
-    const chatMsg = `🔔 *Gasto Detectado* (${banco_o_metodo})\nMonto: *${newTx.moneda} ${newTx.monto.toFixed(2)}*\nDetalle: _${newTx.descripcion_original}_\n\n¿En qué gastaste? Responde con el detalle (ej: "almuerzo", "taxi", "frutas").`;
+    const cuotaMsg = newTx.cuota_total
+      ? `\nCuota: *${newTx.cuota_actual || '?'} de ${newTx.cuota_total}*`
+      : '';
+    const chatMsg = `🔔 *Gasto Detectado* (${banco_o_metodo})\nMonto: *${newTx.moneda} ${newTx.monto.toFixed(2)}*\nDetalle: _${newTx.descripcion_original}_${cuotaMsg}\n\n¿En qué gastaste? Responde con el detalle (ej: "almuerzo", "taxi", "frutas").`;
     
     const sentMsg = await sendTelegramMessage(process.env.TELEGRAM_CHAT_ID, chatMsg);
     if (sentMsg && sentMsg.message_id) {

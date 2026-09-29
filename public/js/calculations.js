@@ -86,11 +86,117 @@ export function getMontoEnSoles(tx, tipoCambio) {
   return monto;
 }
 
+// ---------------------------------------------------------------------------
+// CUOTAS
+// ---------------------------------------------------------------------------
+// Una compra en cuotas se marca con `cuota_total`. Llega en DOS formas distintas
+// según cómo la reporte el banco, y las dos tienen que convivir:
+//
+//   A) CARGO ÚNICO POR EL TOTAL. Es lo que pasó con la moto en Cencosud: un solo
+//      cargo de S/ 6,995 y después cuotas mensuales que no llegan por correo.
+//      Se marca `cuota_total: 12` y `cuota_actual: null`; `monto` es el precio
+//      completo y la cuota mensual es monto / cuota_total.
+//      El total YA está dentro de la deuda de la tarjeta.
+//
+//   B) CARGO MENSUAL DE UNA SOLA CUOTA. Es lo que hace Interbank: cada mes cobra
+//      "Mercado Pago (Cuota 7/12)" por S/ 240.75. Se marca `cuota_actual: 7`,
+//      `cuota_total: 12`, y `monto` es UNA cuota.
+//      Las cuotas que faltan TODAVÍA NO están en la deuda de la tarjeta.
+//
+// Por eso el pendiente se devuelve partido en dos: `saldoEnDeuda` (caso A, ya
+// contabilizado en la tarjeta) y `comprometidoFuturo` (caso B, aún por cobrar).
+// Sumarlos y restarlos juntos de la deuda daría un número inventado.
+
+// Meses completos entre dos fechas YYYY-MM-DD. Si aún no se cumple el día del
+// mes, ese mes no cuenta (del 22/07 al 21/08 va 0; al 22/08 va 1).
+export function mesesTranscurridos(desde, hasta) {
+  if (!desde || !hasta) return 0;
+  const a = desde.split('-').map(Number);
+  const b = hasta.split('-').map(Number);
+  if (a.length !== 3 || b.length !== 3) return 0;
+  let meses = (b[0] - a[0]) * 12 + (b[1] - a[1]);
+  if (b[2] < a[2]) meses -= 1;
+  return Math.max(0, meses);
+}
+
+// Estado de todas las compras en cuotas vivas a la fecha `hoyStr`.
+export function calcularCuotas(transacciones, tipoCambio = 3.80, hoyStr) {
+  const hoy = hoyStr || new Date().toISOString().substring(0, 10);
+  const planes = [];
+  const ultimaPorCompra = new Map();
+
+  (transacciones || []).forEach(tx => {
+    if (tx.tipo !== 'GASTO') return;
+    const total = parseInt(tx.cuota_total, 10);
+    if (!total || total < 2) return;
+    const actual = parseInt(tx.cuota_actual, 10) || null;
+
+    if (!actual) {
+      planes.push({ tx, caso: 'A' });
+      return;
+    }
+    // Caso B: el banco manda un correo por cada cuota, así que la misma compra
+    // aparece un mes tras otro. Nos quedamos solo con la fila más adelantada;
+    // contarlas todas multiplicaría la deuda por la cantidad de correos leídos.
+    const clave = [
+      tx.tarjeta_id || tx.cuenta_id || 'x',
+      (tx.descripcion_original || tx.descripcion || '').toLowerCase().trim(),
+      total
+    ].join('|');
+    const previa = ultimaPorCompra.get(clave);
+    if (!previa || actual > (parseInt(previa.cuota_actual, 10) || 0)) {
+      ultimaPorCompra.set(clave, tx);
+    }
+  });
+  ultimaPorCompra.forEach(tx => planes.push({ tx, caso: 'B' }));
+
+  let cuotaMensual = 0;
+  let saldoEnDeuda = 0;
+  let comprometidoFuturo = 0;
+  const detalle = [];
+
+  planes.forEach(({ tx, caso }) => {
+    const total = parseInt(tx.cuota_total, 10);
+    const montoSoles = getMontoEnSoles(tx, tipoCambio);
+    const transcurridos = mesesTranscurridos(tx.fecha, hoy);
+
+    // Caso A: el monto es la compra entera. Caso B: el monto es una cuota, y el
+    // banco ya iba por la cuota `cuota_actual` cuando lo leímos, así que hay que
+    // avanzarla por los meses que pasaron desde entonces (los correos se pierden).
+    const cuota = caso === 'A' ? montoSoles / total : montoSoles;
+    const pagadas = caso === 'A'
+      ? Math.min(transcurridos, total)
+      : Math.min(parseInt(tx.cuota_actual, 10) + transcurridos, total);
+    const restantes = total - pagadas;
+    if (restantes <= 0) return; // ya terminó de pagarse
+
+    cuotaMensual += cuota;
+    if (caso === 'A') saldoEnDeuda += cuota * restantes;
+    else comprometidoFuturo += cuota * restantes;
+
+    detalle.push({
+      id: tx.id,
+      descripcion: tx.descripcion || tx.descripcion_original || 'Compra en cuotas',
+      tarjeta_id: tx.tarjeta_id || null,
+      cuenta_id: tx.cuenta_id || null,
+      cuota,
+      pagadas,
+      total,
+      restantes,
+      pendiente: cuota * restantes,
+      enDeuda: caso === 'A'
+    });
+  });
+
+  detalle.sort((x, y) => y.pendiente - x.pendiente);
+  return { cuotaMensual, saldoEnDeuda, comprometidoFuturo, detalle };
+}
+
 // Realiza todos los cálculos matemáticos del estado actual de transacciones.
 // TEST-01: `monthStr` (formato YYYY-MM) es opcional; por defecto usa el mes
 // actual del sistema. Pasarlo explícito permite tests deterministas y
 // calcular agregados de cualquier mes histórico.
-export function calculateBalances(state, monthStr) {
+export function calculateBalances(state, monthStr, hoyStr) {
   const currentMonthStr = monthStr || getCurrentMonthString(); // Formato YYYY-MM
   const tipoCambio = parseFloat(state.configuracion?.tipo_cambio_usd) || 3.80;
 
@@ -179,6 +285,13 @@ export function calculateBalances(state, monthStr) {
 
   balanceGeneral = sumaDebito - sumaDeudas;
 
+  // Partir la deuda de tarjetas en dos cosas que no se parecen en nada:
+  // lo que son cuotas ya comprometidas y lo que es consumo del último ciclo,
+  // que se paga solo el mes que viene. Mostrarlas juntas hace que un consumo
+  // normal se lea como deuda.
+  const cuotas = calcularCuotas(state.transacciones, tipoCambio, hoyStr);
+  const consumoRotativo = Math.max(0, sumaDeudas - cuotas.saldoEnDeuda);
+
   return {
     balanceGeneral,
     ingresosMes,
@@ -187,7 +300,9 @@ export function calculateBalances(state, monthStr) {
     deudasTarjetas,
     gastosPorCategoriaEsteMes,
     sumaDebito,
-    sumaDeudas
+    sumaDeudas,
+    cuotas,
+    consumoRotativo
   };
 }
 
