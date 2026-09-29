@@ -47,10 +47,18 @@ function renderDeudaSplit(balances, mon) {
   const faltan = Math.max(...cuotas.detalle.map(d => d.restantes));
   const pendienteTotal = cuotas.saldoEnDeuda + cuotas.comprometidoFuturo;
 
+  // Se habla de CUOTAS que faltan, no de meses: que falten 5 cuotas no promete
+  // que se paguen una por mes. Y si hace rato que nadie confirma en qué cuota
+  // va, se dice — un número viejo presentado como fresco es peor que ninguno.
+  const viejas = cuotas.detalle.filter(d => d.mesesSinConfirmar >= 2).length;
+  const aviso = viejas
+    ? ` · ⚠️ ${viejas} sin confirmar hace meses`
+    : "";
+
   const filas = [
     {
       label: "En cuotas",
-      sub: `${compras} ${compras === 1 ? "compra" : "compras"} · la última termina en ${faltan} ${faltan === 1 ? "mes" : "meses"}`,
+      sub: `${compras} ${compras === 1 ? "compra" : "compras"} · faltan ${faltan} ${faltan === 1 ? "cuota" : "cuotas"}${aviso}`,
       val: pendienteTotal
     },
     {

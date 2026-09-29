@@ -89,26 +89,38 @@ export function getMontoEnSoles(tx, tipoCambio) {
 // ---------------------------------------------------------------------------
 // CUOTAS
 // ---------------------------------------------------------------------------
-// Una compra en cuotas se marca con `cuota_total`. Llega en DOS formas distintas
-// según cómo la reporte el banco, y las dos tienen que convivir:
+// Una compra en cuotas se marca con tres campos:
 //
-//   A) CARGO ÚNICO POR EL TOTAL. Es lo que pasó con la moto en Cencosud: un solo
-//      cargo de S/ 6,995 y después cuotas mensuales que no llegan por correo.
-//      Se marca `cuota_total: 12` y `cuota_actual: null`; `monto` es el precio
-//      completo y la cuota mensual es monto / cuota_total.
-//      El total YA está dentro de la deuda de la tarjeta.
+//   cuota_total     cuántas cuotas tiene el plan.
+//   cuota_actual    cuántas van PAGADAS según la última confirmación.
+//   cuota_es_total  qué representa el `monto` de esta fila.
 //
-//   B) CARGO MENSUAL DE UNA SOLA CUOTA. Es lo que hace Interbank: cada mes cobra
-//      "Mercado Pago (Cuota 7/12)" por S/ 240.75. Se marca `cuota_actual: 7`,
-//      `cuota_total: 12`, y `monto` es UNA cuota.
-//      Las cuotas que faltan TODAVÍA NO están en la deuda de la tarjeta.
+// El último existe porque los bancos reportan de dos maneras distintas y las dos
+// tienen que convivir:
 //
-// Por eso el pendiente se devuelve partido en dos: `saldoEnDeuda` (caso A, ya
-// contabilizado en la tarjeta) y `comprometidoFuturo` (caso B, aún por cobrar).
-// Sumarlos y restarlos juntos de la deuda daría un número inventado.
+//   cuota_es_total = true  -> CARGO ÚNICO POR EL TOTAL. Es la moto en Cencosud:
+//     un solo cargo de S/ 6,995 y después cuotas que no llegan por correo.
+//     La cuota mensual es monto / cuota_total, y el total YA está dentro de la
+//     deuda de la tarjeta.
+//
+//   cuota_es_total = false -> CARGO MENSUAL DE UNA CUOTA. Es Interbank cobrando
+//     "Mercado Pago (Cuota 7/12)" por S/ 240.75 cada mes. La cuota mensual es el
+//     monto tal cual, y lo que falta TODAVÍA NO está en la deuda de la tarjeta.
+//
+// Por eso el pendiente se devuelve partido: `saldoEnDeuda` (ya contabilizado) y
+// `comprometidoFuturo` (aún por cobrar). Sumarlos y restarlos juntos de la deuda
+// daría un número inventado.
+//
+// REGLA DURA: las cuotas pagadas SOLO salen de `cuota_actual`, que es lo que dijo
+// el banco o lo que corrigió Jano. NUNCA se deducen contando meses del calendario:
+// que hayan pasado dos meses no prueba que se pagaron dos cuotas. La moto es el
+// caso exacto — comprada el 22/07, primera cuota recién pagada el 16/09. Contar
+// por fechas la daba en 2 de 12 y la verdad era 1 de 12. Cuando el dato está viejo
+// se marca con `mesesSinConfirmar` y se avisa, que es muy distinto de rellenarlo.
 
 // Meses completos entre dos fechas YYYY-MM-DD. Si aún no se cumple el día del
 // mes, ese mes no cuenta (del 22/07 al 21/08 va 0; al 22/08 va 1).
+// Se usa para avisar que un dato está viejo, nunca para deducir cuotas pagadas.
 export function mesesTranscurridos(desde, hasta) {
   if (!desde || !hasta) return 0;
   const a = desde.split('-').map(Number);
@@ -129,14 +141,13 @@ export function calcularCuotas(transacciones, tipoCambio = 3.80, hoyStr) {
     if (tx.tipo !== 'GASTO') return;
     const total = parseInt(tx.cuota_total, 10);
     if (!total || total < 2) return;
-    const actual = parseInt(tx.cuota_actual, 10) || null;
 
-    if (!actual) {
-      planes.push({ tx, caso: 'A' });
+    if (tx.cuota_es_total) {
+      planes.push(tx);
       return;
     }
-    // Caso B: el banco manda un correo por cada cuota, así que la misma compra
-    // aparece un mes tras otro. Nos quedamos solo con la fila más adelantada;
+    // El banco manda un correo por cada cuota, así que la misma compra aparece
+    // un mes tras otro. Nos quedamos solo con la confirmación más reciente;
     // contarlas todas multiplicaría la deuda por la cantidad de correos leídos.
     const clave = [
       tx.tarjeta_id || tx.cuenta_id || 'x',
@@ -144,36 +155,34 @@ export function calcularCuotas(transacciones, tipoCambio = 3.80, hoyStr) {
       total
     ].join('|');
     const previa = ultimaPorCompra.get(clave);
-    if (!previa || actual > (parseInt(previa.cuota_actual, 10) || 0)) {
+    if (!previa || (parseInt(tx.cuota_actual, 10) || 0) > (parseInt(previa.cuota_actual, 10) || 0)) {
       ultimaPorCompra.set(clave, tx);
     }
   });
-  ultimaPorCompra.forEach(tx => planes.push({ tx, caso: 'B' }));
+  ultimaPorCompra.forEach(tx => planes.push(tx));
 
   let cuotaMensual = 0;
   let saldoEnDeuda = 0;
   let comprometidoFuturo = 0;
   const detalle = [];
 
-  planes.forEach(({ tx, caso }) => {
+  planes.forEach(tx => {
     const total = parseInt(tx.cuota_total, 10);
     const montoSoles = getMontoEnSoles(tx, tipoCambio);
-    const transcurridos = mesesTranscurridos(tx.fecha, hoy);
+    const esTotal = !!tx.cuota_es_total;
 
-    // Caso A: el monto es la compra entera. Caso B: el monto es una cuota, y el
-    // banco ya iba por la cuota `cuota_actual` cuando lo leímos, así que hay que
-    // avanzarla por los meses que pasaron desde entonces (los correos se pierden).
-    const cuota = caso === 'A' ? montoSoles / total : montoSoles;
-    const pagadas = caso === 'A'
-      ? Math.min(transcurridos, total)
-      : Math.min(parseInt(tx.cuota_actual, 10) + transcurridos, total);
+    const cuota = esTotal ? montoSoles / total : montoSoles;
+    // Solo lo confirmado. Si nadie dijo cuántas van, van cero: preferible pasarse
+    // por prudente que inventar un avance que no existe.
+    const pagadas = Math.min(parseInt(tx.cuota_actual, 10) || 0, total);
     const restantes = total - pagadas;
     if (restantes <= 0) return; // ya terminó de pagarse
 
     cuotaMensual += cuota;
-    if (caso === 'A') saldoEnDeuda += cuota * restantes;
+    if (esTotal) saldoEnDeuda += cuota * restantes;
     else comprometidoFuturo += cuota * restantes;
 
+    const confirmadoEl = tx.cuota_confirmada_el || tx.fecha || null;
     detalle.push({
       id: tx.id,
       descripcion: tx.descripcion || tx.descripcion_original || 'Compra en cuotas',
@@ -184,7 +193,9 @@ export function calcularCuotas(transacciones, tipoCambio = 3.80, hoyStr) {
       total,
       restantes,
       pendiente: cuota * restantes,
-      enDeuda: caso === 'A'
+      enDeuda: esTotal,
+      confirmadoEl,
+      mesesSinConfirmar: mesesTranscurridos(confirmadoEl, hoy)
     });
   });
 

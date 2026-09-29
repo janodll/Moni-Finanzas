@@ -1,10 +1,13 @@
-// Rellena cuota_actual / cuota_total en las transacciones que YA están guardadas.
+// Rellena los campos de cuotas en las transacciones que YA están guardadas.
 //
-// Dos fuentes:
-//   1. La descripción. Los cargos de Interbank y Falabella ya venían con el texto
-//      "(Cuota 7/12)" adentro; el dato siempre estuvo, solo que en una cadena.
-//   2. La lista MANUALES de abajo, para compras que se cargaron por el total y
-//      no dicen cuotas en ninguna parte (la moto de Cencosud).
+// Solo escribe lo que está CONFIRMADO por una fuente real:
+//   1. La descripción, cuando el propio banco escribió "(Cuota 7/12)" adentro.
+//      El dato siempre estuvo, solo que atrapado en una cadena de texto.
+//   2. La lista MANUALES, para compras que Jano confirmó a mano.
+//
+// Lo que NO calza entre una fuente y otra va a CONFLICTOS: se reporta y no se
+// toca. Es preferible un hueco visible a un número inventado que después nadie
+// puede distinguir de uno real.
 //
 // Requiere haber corrido antes sql/2026-09-28-cuotas.sql.
 // Uso:  node scripts/backfill_cuotas.mjs          (solo muestra qué haría)
@@ -18,46 +21,83 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
 
-// Compras cargadas por el total, que hay que marcar a mano porque el banco
-// nunca mandó un correo diciendo en cuántas cuotas quedaron.
+// Compras cargadas por el total, confirmadas por Jano. De estas no llega ningún
+// correo que diga en cuántas cuotas quedaron, así que no hay de dónde leerlas.
 const MANUALES = [
-  { match: /compra de moto/i, cuota_total: 12 }
+  {
+    match: /compra de moto/i,
+    fields: {
+      cuota_total: 12,
+      cuota_actual: 1,                        // único pago a Cencosud: 16/09
+      cuota_es_total: true,                   // el monto es la moto entera
+      cuota_confirmada_el: '2026-09-16'
+    },
+    nota: '12 cuotas, 1 pagada (confirmado por Jano)'
+  }
+];
+
+// Filas que el script NO sabe interpretar y por lo tanto no toca. El préstamo
+// de Falabella no es una compra en cuotas de la tarjeta: son pagos mensuales
+// sueltos, cada uno su propia fila (29/05, 08/08, 10/09). Contar las filas no
+// dice cuántas cuotas faltan, porque los meses sin registrar no dejan rastro.
+const CONFLICTOS = [
+  {
+    match: /préstamo falabella|prestamo falabella|préstamo cmr|prestamo cmr/i,
+    motivo: 'son pagos mensuales sueltos, no una compra en cuotas: Moni no puede deducir cuántas faltan',
+    jano: 'Jano dice que el préstamo es de 6 cuotas y le falta 1 o 2 — hay que confirmarlo y cargarlo a mano'
+  }
 ];
 
 const RE_CUOTA = /cuota\s*(\d+)\s*(?:\/|de)\s*(\d+)/i;
 
 const txs = await (await fetch(`${SUPABASE_URL}/rest/v1/transacciones?select=*&order=id`, { headers: H })).json();
 const cambios = [];
+const pendientes = [];
 
 for (const t of txs) {
   if (t.tipo !== 'GASTO') continue;
-  const texto = `${t.descripcion || ''} ${t.descripcion_original || ''}`;
+  const texto = `${t.descripcion || ''} ${t.descripcion_original || ''}`.trim();
+
+  const conflicto = CONFLICTOS.find(c => c.match.test(texto));
+  if (conflicto) {
+    pendientes.push({ id: t.id, desc: texto.slice(0, 44), ...conflicto });
+    continue;
+  }
+
+  const man = MANUALES.find(x => x.match.test(texto));
+  if (man) {
+    cambios.push({ id: t.id, fields: { ...man.fields }, txt: man.nota, desc: texto.slice(0, 44) });
+    continue;
+  }
 
   const m = RE_CUOTA.exec(texto);
   if (m) {
     const actual = parseInt(m[1], 10);
     const total = parseInt(m[2], 10);
-    if (total >= 2 && actual >= 1 && actual <= total &&
-        (t.cuota_actual !== actual || t.cuota_total !== total)) {
-      cambios.push({ id: t.id, fields: { cuota_actual: actual, cuota_total: total }, txt: `cuota ${actual}/${total}`, desc: texto.trim().slice(0, 46) });
+    if (total >= 2 && actual >= 1 && actual <= total) {
+      cambios.push({
+        id: t.id,
+        fields: { cuota_actual: actual, cuota_total: total, cuota_es_total: false, cuota_confirmada_el: t.fecha },
+        txt: `cuota ${actual}/${total} segun el banco`,
+        desc: texto.slice(0, 44)
+      });
     }
-    continue;
-  }
-
-  const man = MANUALES.find(x => x.match.test(texto));
-  if (man && t.cuota_total !== man.cuota_total) {
-    cambios.push({ id: t.id, fields: { cuota_actual: null, cuota_total: man.cuota_total }, txt: `${man.cuota_total} cuotas (manual)`, desc: texto.trim().slice(0, 46) });
   }
 }
 
-if (!cambios.length) {
-  console.log('No hay nada que rellenar. Todo al día.');
-  process.exit(0);
+if (cambios.length) {
+  console.log(`${cambios.length} transacciones por marcar:\n`);
+  for (const c of cambios) console.log(`  id ${String(c.id).padStart(4)}  ${c.txt.padEnd(38)} ${c.desc}`);
+} else {
+  console.log('No hay nada que rellenar.');
 }
 
-console.log(`${cambios.length} transacciones por marcar:\n`);
-for (const c of cambios) console.log(`  id ${String(c.id).padStart(4)}  ${c.txt.padEnd(20)} ${c.desc}`);
+if (pendientes.length) {
+  console.log(`\n${pendientes.length} necesitan que Jano confirme (NO se tocan):\n`);
+  for (const p of pendientes) console.log(`  id ${String(p.id).padStart(4)}  ${p.desc}\n          ${p.motivo}\n          ${p.jano}`);
+}
 
+if (!cambios.length) process.exit(0);
 if (!APPLY) {
   console.log('\nEsto fue solo una simulación. Para escribir: node scripts/backfill_cuotas.mjs --apply');
   process.exit(0);

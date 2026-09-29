@@ -886,6 +886,13 @@ async function handleAutoRegister(req, res) {
     newTx.cuota_total = cuotaTotalNum;
     const cuotaActualNum = parseInt(cuota_actual, 10);
     newTx.cuota_actual = cuotaActualNum >= 1 ? cuotaActualNum : null;
+    // Lo que llega por correo es SIEMPRE el cobro de una cuota suelta, no la
+    // compra entera: el banco factura mes a mes. El cargo por el total (la moto)
+    // se marca a mano, porque de ese no llega ningún correo que lo diga.
+    newTx.cuota_es_total = false;
+    // Queda fechado para poder avisar despues que el dato esta viejo, en vez de
+    // estimar cuantas cuotas mas habran pasado.
+    newTx.cuota_confirmada_el = newTx.fecha;
   }
 
   // Si ya tiene categoría y descripción final estructurada
