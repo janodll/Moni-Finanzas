@@ -25,6 +25,20 @@ const H = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Cont
 // correo que diga en cuántas cuotas quedaron, así que no hay de dónde leerlas.
 const MANUALES = [
   {
+    // El préstamo Falabella no es una compra en cuotas de la tarjeta: son pagos
+    // mensuales sueltos, cada uno su propia fila. Contar filas no dice cuántas
+    // faltan (los meses sin registrar no dejan rastro), así que el plan se
+    // ancla en el ÚLTIMO pago hecho y lo confirmó Jano.
+    id: 737,                                  // pago del 10/09, el 4to de 6
+    fields: {
+      cuota_total: 6,
+      cuota_actual: 4,
+      cuota_es_total: false,                  // el monto de la fila es UNA cuota
+      cuota_confirmada_el: '2026-09-10'
+    },
+    nota: 'prestamo S/1000 en 6 cuotas, van 4 (confirmado por Jano)'
+  },
+  {
     match: /compra de moto/i,
     fields: {
       cuota_total: 12,
@@ -36,17 +50,14 @@ const MANUALES = [
   }
 ];
 
-// Filas que el script NO sabe interpretar y por lo tanto no toca. El préstamo
-// de Falabella no es una compra en cuotas de la tarjeta: son pagos mensuales
-// sueltos, cada uno su propia fila (29/05, 08/08, 10/09). Contar las filas no
-// dice cuántas cuotas faltan, porque los meses sin registrar no dejan rastro.
-const CONFLICTOS = [
-  {
-    match: /préstamo falabella|prestamo falabella|préstamo cmr|prestamo cmr/i,
-    motivo: 'son pagos mensuales sueltos, no una compra en cuotas: Moni no puede deducir cuántas faltan',
-    jano: 'Jano dice que el préstamo es de 6 cuotas y le falta 1 o 2 — hay que confirmarlo y cargarlo a mano'
-  }
-];
+// Filas que el script NO sabe interpretar y por lo tanto no toca.
+const CONFLICTOS = [];
+
+// Filas cuyo texto SÍ calza con "Cuota N/M" pero que hay que dejar limpias,
+// porque el plan ya está anclado en otra fila y contarlas lo duplicaría.
+// La 81 es el mismo préstamo Falabella que la 737: alguien tipeó "Cuota 1/12"
+// a mano en mayo, el plan real es de 6 cuotas y va anclado en el último pago.
+const LIMPIAR = [81];
 
 const RE_CUOTA = /cuota\s*(\d+)\s*(?:\/|de)\s*(\d+)/i;
 
@@ -58,13 +69,25 @@ for (const t of txs) {
   if (t.tipo !== 'GASTO') continue;
   const texto = `${t.descripcion || ''} ${t.descripcion_original || ''}`.trim();
 
+  if (LIMPIAR.includes(t.id)) {
+    if (t.cuota_total !== null) {
+      cambios.push({
+        id: t.id,
+        fields: { cuota_actual: null, cuota_total: null, cuota_es_total: null, cuota_confirmada_el: null },
+        txt: 'LIMPIAR: duplica un plan ya anclado en otra fila',
+        desc: texto.slice(0, 44)
+      });
+    }
+    continue;
+  }
+
   const conflicto = CONFLICTOS.find(c => c.match.test(texto));
   if (conflicto) {
     pendientes.push({ id: t.id, desc: texto.slice(0, 44), ...conflicto });
     continue;
   }
 
-  const man = MANUALES.find(x => x.match.test(texto));
+  const man = MANUALES.find(x => (x.id ? x.id === t.id : x.match.test(texto)));
   if (man) {
     cambios.push({ id: t.id, fields: { ...man.fields }, txt: man.nota, desc: texto.slice(0, 44) });
     continue;
