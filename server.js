@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
-import { resolveAccountOrCard, buscarCuentaEnTexto } from './resolver.js';
+import { resolveAccountOrCard, buscarCuentaEnTexto, normalizarUltimos4 } from './resolver.js';
 
 const stateMutex = new Mutex();
 
@@ -807,7 +807,8 @@ async function handleAutoRegister(req, res) {
     categoria,
     descripcion,
     cuota_actual,
-    cuota_total
+    cuota_total,
+    ultimos4
   } = req.body;
 
   if (!monto || !banco_o_metodo) {
@@ -862,7 +863,7 @@ async function handleAutoRegister(req, res) {
   const isCreditCard = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud', 'sip'].some(keyword =>
     banco_o_metodo.toLowerCase().includes(keyword)
   );
-  const { cuenta_id, tarjeta_id } = resolveAccountOrCard(banco_o_metodo, isCreditCard, state);
+  const { cuenta_id, tarjeta_id } = resolveAccountOrCard(banco_o_metodo, isCreditCard, state, ultimos4);
 
   const newTx = {
     tipo: tipo || "GASTO",
@@ -875,6 +876,7 @@ async function handleAutoRegister(req, res) {
     nro_operacion: nro_operacion || null,
     banco_o_metodo: banco_o_metodo,
     descripcion_original: descripcion_original || banco_o_metodo,
+    ultimos4: normalizarUltimos4(ultimos4),
     created_at: new Date().toISOString()
   };
 
@@ -1290,7 +1292,7 @@ No devuelvas nada más que el JSON limpio.
             const esTarjetaCredito = ['falabella', 'cmr', 'tarjeta bbva', 'tarjeta oh', 'tarjeta interbank', 'tarjeta cencosud'].some(keyword =>
               pendingTx.banco_o_metodo.toLowerCase().includes(keyword)
             );
-            const reResuelto = resolveAccountOrCard(pendingTx.banco_o_metodo, esTarjetaCredito, state);
+            const reResuelto = resolveAccountOrCard(pendingTx.banco_o_metodo, esTarjetaCredito, state, pendingTx.ultimos4);
             if (reResuelto.cuenta_id || reResuelto.tarjeta_id) {
               pendingTx.cuenta_id = reResuelto.cuenta_id;
               pendingTx.tarjeta_id = reResuelto.tarjeta_id;

@@ -90,8 +90,16 @@ Extrae la información y responde ÚNICAMENTE con un objeto JSON válido con est
   "descripcion_original": "<A quién se pagó o detalle>",
   "nro_operacion": "<número de operación, constancia o referencia si aparece en el correo; usa null si no hay>",
   "cuota_actual": <número de cuota que se está cobrando, o null>,
-  "cuota_total": <cantidad total de cuotas del plan, o null>
+  "cuota_total": <cantidad total de cuotas del plan, o null>,
+  "ultimos4": "<los últimos 4 dígitos de la tarjeta o cuenta usada, o null>"
 }
+
+REGLA DE LOS 4 DÍGITOS — es la más importante de todas, porque es el único dato que no depende de tu interpretación:
+Casi todos los correos dicen con qué producto se hizo la operación: "Tarjeta terminada en 4821", "****4821", "XXXX-XXXX-XXXX-4821", "cuenta ...9037", "tarjeta nro 4821".
+- Copia SOLO esos 4 dígitos finales en "ultimos4".
+- Si el correo trae varios números, usa el de la TARJETA O CUENTA con la que se pagó. NO el número de operación, ni la constancia, ni montos, ni fechas, ni teléfonos.
+- Si el correo no muestra ningún número de tarjeta o cuenta, pon null.
+NUNCA inventes ni deduzcas estos dígitos. Un número inventado manda el gasto a la tarjeta equivocada y descuadra los saldos. Si tienes la menor duda, pon null: el sistema sabe arreglárselas sin ellos.
 
 REGLA DE CUOTAS: Muchos cargos de tarjeta vienen en cuotas y el correo lo dice, con formas como "Cuota 7/12", "cuota 7 de 12", "3/6" o "en 12 cuotas sin intereses".
 - Si aparecen los DOS números (cuál cuota y cuántas son), ponlos en "cuota_actual" y "cuota_total".

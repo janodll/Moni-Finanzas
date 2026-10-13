@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { resolveAccountOrCard } from '../resolver.js';
+import { resolveAccountOrCard, buscarPorUltimos4, normalizarUltimos4 } from '../resolver.js';
 
 // Estado real del proyecto (ver ESTADO.md seccion 3). Nota que NO existe ninguna
 // tarjeta BCP: BCP es solo cuenta de debito, para Jano y para Andrea.
@@ -98,4 +98,92 @@ test('una palabra que contenga "sip" no manda el gasto a la tarjeta SIP', () => 
     resolveAccountOrCard('Restaurante Sipan', false, state),
     { cuenta_id: null, tarjeta_id: null }
   );
+});
+
+// ===========================================================================
+// ULTIMOS 4 DIGITOS
+// ===========================================================================
+// El caso real: Jano tiene cuenta Interbank Y tarjeta Interbank. Cuando el correo
+// no decia "Tarjeta de Credito", el lector mandaba "Interbank Jano" pelado y el
+// gasto de la tarjeta salia de la cuenta. Paso 5 veces. Los 4 digitos los escribe
+// el banco, no la IA, asi que no se prestan a interpretacion.
+
+// Mismo estado de arriba pero con los digitos declarados.
+const stateDigitos = {
+  cuentas: [
+    { id: 1, nombre: 'BCP Jano', titular: 'Jano', ultimos4: '1122' },
+    { id: 3, nombre: 'Interbank Jano', titular: 'Jano', ultimos4: '9037' },
+    { id: 4, nombre: 'BBVA Andrea', titular: 'Andrea', ultimos4: '7788' }
+  ],
+  tarjetas: [
+    { id: 2, nombre: 'Interbank Jano', titular: 'Jano', tipo: 'Credito', ultimos4: '4821' },
+    { id: 5, nombre: 'Tarjeta BBVA', titular: 'Andrea', tipo: 'Credito', ultimos4: ['3344', '3345'] }
+  ]
+};
+
+test('normalizarUltimos4() acepta las formas en que los bancos los escriben', () => {
+  assert.strictEqual(normalizarUltimos4('4821'), '4821');
+  assert.strictEqual(normalizarUltimos4('****4821'), '4821');
+  assert.strictEqual(normalizarUltimos4('XXXX-XXXX-XXXX-4821'), '4821');
+  assert.strictEqual(normalizarUltimos4(4821), '4821');
+  assert.strictEqual(normalizarUltimos4('482'), null);   // muy corto: no se inventa
+  assert.strictEqual(normalizarUltimos4(''), null);
+  assert.strictEqual(normalizarUltimos4(null), null);
+});
+
+test('los 4 digitos mandan sobre el nombre que escribio la IA', () => {
+  // El correo de la creatina decia "Interbank Jano" (nombre de la CUENTA) pero los
+  // digitos eran los de la TARJETA. Antes el gasto salia de la cuenta: 159.50 de
+  // descuadre. Ahora el numero gana.
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Interbank Jano', false, stateDigitos, '4821'),
+    { cuenta_id: null, tarjeta_id: 2 }
+  );
+  // Y al reves: aunque el texto diga "Tarjeta", si los digitos son de la cuenta,
+  // es la cuenta.
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Tarjeta Interbank Jano', true, stateDigitos, '9037'),
+    { cuenta_id: 3, tarjeta_id: null }
+  );
+});
+
+test('una tarjeta puede tener varios finales declarados', () => {
+  assert.deepStrictEqual(buscarPorUltimos4('3344', stateDigitos), { cuenta_id: null, tarjeta_id: 5 });
+  assert.deepStrictEqual(buscarPorUltimos4('3345', stateDigitos), { cuenta_id: null, tarjeta_id: 5 });
+});
+
+test('si los digitos no calzan con nada, se cae al emparejado por nombre', () => {
+  // No se inventa nada: sigue el camino de siempre.
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Interbank Jano', false, stateDigitos, '0000'),
+    { cuenta_id: 3, tarjeta_id: null }
+  );
+  assert.strictEqual(buscarPorUltimos4('0000', stateDigitos), null);
+});
+
+test('si dos productos terminan igual, no se adivina', () => {
+  const ambiguo = {
+    cuentas: [{ id: 1, nombre: 'BCP Jano', ultimos4: '4821' }],
+    tarjetas: [{ id: 2, nombre: 'Interbank Jano', tipo: 'Credito', ultimos4: '4821' }]
+  };
+  // Dos calzan: devuelve null y deja que decida el nombre. Elegir uno al azar es
+  // justo lo que descuadra los saldos.
+  assert.strictEqual(buscarPorUltimos4('4821', ambiguo), null);
+});
+
+test('sin digitos en el correo, todo sigue funcionando como antes', () => {
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Tarjeta Interbank Jano', true, stateDigitos, null),
+    { cuenta_id: null, tarjeta_id: 2 }
+  );
+  assert.deepStrictEqual(
+    resolveAccountOrCard('Interbank Jano', false, stateDigitos, undefined),
+    { cuenta_id: 3, tarjeta_id: null }
+  );
+});
+
+test('los productos sin digitos declarados no capturan correos ajenos', () => {
+  // Las cuentas de Andrea no tienen ultimos4 en stateDigitos: un correo con
+  // digitos desconocidos no debe caer en ellas por descarte.
+  assert.strictEqual(buscarPorUltimos4('5555', stateDigitos), null);
 });

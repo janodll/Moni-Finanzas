@@ -1,10 +1,53 @@
+// Normaliza unos "ultimos 4" a exactamente 4 digitos. Los correos los escriben de
+// mil formas: "4821", "****4821", "XXXX-XXXX-XXXX-4821", "terminada en 4821".
+export function normalizarUltimos4(valor) {
+  if (valor === null || valor === undefined) return null;
+  const digitos = String(valor).replace(/\D/g, '');
+  if (digitos.length < 4) return null;
+  return digitos.slice(-4);
+}
+
+// Busca la cuenta o tarjeta por los ultimos 4 digitos que venian en el correo.
+//
+// Es el unico dato del correo que NO depende de como la IA interprete el texto: el
+// banco lo escribe literal. Por eso manda sobre el nombre. El caso que lo motiva:
+// Jano tiene cuenta Interbank Y tarjeta Interbank, y cuando el correo no decia
+// "Tarjeta de Credito" el gasto de la tarjeta terminaba saliendo de la cuenta.
+//
+// Devuelve null si no calza ninguna O si calza mas de una: con dos tarjetas que
+// terminan igual no hay forma de saber cual es, y adivinar es justo lo que rompe
+// los saldos. Ahi se cae al emparejado por nombre de siempre.
+export function buscarPorUltimos4(ultimos4, state) {
+  const buscado = normalizarUltimos4(ultimos4);
+  if (!buscado) return null;
+
+  const tieneEseFinal = (item) => {
+    const declarados = Array.isArray(item.ultimos4) ? item.ultimos4 : [item.ultimos4];
+    return declarados.some(d => normalizarUltimos4(d) === buscado);
+  };
+
+  const cuentas = (state.cuentas || []).filter(tieneEseFinal);
+  const tarjetas = (state.tarjetas || []).filter(tieneEseFinal);
+
+  if (cuentas.length + tarjetas.length !== 1) return null;
+  return cuentas.length
+    ? { cuenta_id: cuentas[0].id, tarjeta_id: null }
+    : { cuenta_id: null, tarjeta_id: tarjetas[0].id };
+}
+
 // Mapea el texto del banco o metodo que escribio el lector (ej. "Tarjeta Interbank Jano",
 // "BCP Andrea") a un cuenta_id o tarjeta_id real del estado.
 //
 // Vive en su propio modulo porque server.js levanta el servidor al importarse y esta
 // funcion necesita poder probarse sola: es el punto donde una etiqueta mal escrita se
 // convierte en plata que no se mueve.
-export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state) {
+export function resolveAccountOrCard(banco_o_metodo, isCreditCard, state, ultimos4) {
+  // Los ultimos 4 digitos mandan sobre todo lo demas. El nombre del banco lo redacta
+  // la IA a partir del correo y se equivoca cuando el banco tiene cuenta Y tarjeta;
+  // los 4 digitos los escribe el banco y no se prestan a interpretacion.
+  const porDigitos = buscarPorUltimos4(ultimos4, state);
+  if (porDigitos) return porDigitos;
+
   const query = (banco_o_metodo || '').toLowerCase().trim();
 
   // Sin texto no hay nada que deducir. Sin esta guarda, query = '' hacia que
