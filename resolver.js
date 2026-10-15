@@ -194,3 +194,23 @@ export function buscarCuentaEnTexto(texto, state) {
   }
   return null;
 }
+
+// ¿La respuesta que escribió Jano describe una TRANSFERENCIA y no un pago de tarjeta?
+//
+// El caso que lo motiva: escribió "Transferencia a interbank Andrea" y el sistema lo
+// registró como pago de la tarjeta Interbank de Andrea. Dos errores en uno — la plata
+// nunca llegó a la cuenta, y la deuda de una tarjeta bajó sin que nadie la pagara.
+//
+// Pasó porque al categorizar se le pasan a la IA los recordatorios pendientes pidiéndole
+// que vea si el pago corresponde a alguno, y existía uno llamado "Tarjeta Interbank
+// Andrea". Con "interbank Andrea" escrito por el usuario, la IA ató los cabos.
+//
+// La palabra que Jano escribe vale más que la deducción de la IA: si dice "transferencia"
+// y no nombra ninguna tarjeta, es una transferencia. Si dice las dos cosas ("transferencia
+// para pagar la tarjeta CMR") se respeta el pago de tarjeta, que es lo que describe.
+export function esTransferenciaSegunUsuario(texto) {
+  const t = (texto || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (!/\btransfer/.test(t)) return false;              // transferencia, transferi, transfiero
+  if (/\btarjetas?\b|\btc\b|\bvisa\b|\bmastercard\b|\bcredito\b/.test(t)) return false;
+  return true;
+}

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert';
-import { resolveAccountOrCard, buscarPorUltimos4, normalizarUltimos4 } from '../resolver.js';
+import { resolveAccountOrCard, buscarPorUltimos4, normalizarUltimos4, esTransferenciaSegunUsuario } from '../resolver.js';
 
 // Estado real del proyecto (ver ESTADO.md seccion 3). Nota que NO existe ninguna
 // tarjeta BCP: BCP es solo cuenta de debito, para Jano y para Andrea.
@@ -186,4 +186,31 @@ test('los productos sin digitos declarados no capturan correos ajenos', () => {
   // Las cuentas de Andrea no tienen ultimos4 en stateDigitos: un correo con
   // digitos desconocidos no debe caer en ellas por descarte.
   assert.strictEqual(buscarPorUltimos4('5555', stateDigitos), null);
+});
+
+// ===========================================================================
+// TRANSFERENCIA vs PAGO DE TARJETA
+// ===========================================================================
+
+test('una transferencia escrita por Jano no es un pago de tarjeta', () => {
+  // Los dos casos reales del 15/10. Se registraron como pagos de tarjeta: la plata
+  // no llegó a la cuenta destino y encima bajó la deuda de una tarjeta que nadie pagó.
+  assert.strictEqual(esTransferenciaSegunUsuario('Transferencia a interbank Andrea'), true);
+  assert.strictEqual(esTransferenciaSegunUsuario('Transferencia a Interbank Jano'), true);
+  assert.strictEqual(esTransferenciaSegunUsuario('transferi a mi bbva'), true);
+  assert.strictEqual(esTransferenciaSegunUsuario('Transferencia a Andrea'), true);
+});
+
+test('si nombra una tarjeta, se respeta el pago de tarjeta', () => {
+  // Pagar la tarjeta POR transferencia sigue siendo pagar la tarjeta.
+  assert.strictEqual(esTransferenciaSegunUsuario('transferencia para pagar la tarjeta CMR'), false);
+  assert.strictEqual(esTransferenciaSegunUsuario('transferencia a mi tc interbank'), false);
+  assert.strictEqual(esTransferenciaSegunUsuario('transferencia a la visa'), false);
+});
+
+test('sin la palabra transferencia no se mete en el medio', () => {
+  assert.strictEqual(esTransferenciaSegunUsuario('Pago mi tc'), false);
+  assert.strictEqual(esTransferenciaSegunUsuario('almuerzo'), false);
+  assert.strictEqual(esTransferenciaSegunUsuario(''), false);
+  assert.strictEqual(esTransferenciaSegunUsuario(null), false);
 });

@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
-import { resolveAccountOrCard, buscarCuentaEnTexto, normalizarUltimos4 } from './resolver.js';
+import { resolveAccountOrCard, buscarCuentaEnTexto, normalizarUltimos4, esTransferenciaSegunUsuario } from './resolver.js';
 
 const stateMutex = new Mutex();
 
@@ -1283,6 +1283,28 @@ No devuelvas nada más que el JSON limpio.
           pendingTx.categoria = parsed.categoria || "Otros";
           pendingTx.descripcion = parsed.descripcion || text;
 
+          // [Transferencia mal leída como pago de tarjeta] Lo que escribe Jano manda sobre
+          // lo que deduce la IA. Escribió "Transferencia a interbank Andrea" y se registró
+          // como pago de esa tarjeta: la plata no llegó a la cuenta y la deuda bajó sin que
+          // nadie pagara. Dos errores del mismo monto, en direcciones opuestas.
+          const janoDijoTransferencia = esTransferenciaSegunUsuario(text);
+          if (janoDijoTransferencia) {
+            const catIA = (pendingTx.categoria || '').toLowerCase();
+            if (catIA.includes('pago') && catIA.includes('tarjeta')) {
+              console.log(`[Telegram-Webhook] La IA dijo "${pendingTx.categoria}" pero Jano escribió "transferencia" sin nombrar tarjeta. Se corrige a Transferencia.`);
+              pendingTx.categoria = "Transferencia";
+            }
+            // Y se suelta el recordatorio de TARJETA que la IA haya atado: una transferencia
+            // no paga una tarjeta, y marcarlo movería su fecha de vencimiento de gratis.
+            if (parsed.recordatorio_pagado_id) {
+              const remLigado = (state.recordatorios || []).find(r => parseInt(r.id) === parseInt(parsed.recordatorio_pagado_id));
+              if (remLigado && remLigado.tipo === "Tarjeta") {
+                console.log(`[Telegram-Webhook] Se ignora el recordatorio de tarjeta "${remLigado.nombre}": Jano escribió una transferencia.`);
+                parsed.recordatorio_pagado_id = null;
+              }
+            }
+          }
+
           // La cuenta/tarjeta se resolvió al llegar el correo (handleAutoRegister). Si en ese
           // momento la cuenta todavía no existía en el estado, quedó en null para siempre y la
           // transacción resulta invisible para saldos y deudas. Se reintenta acá, ahora que el
@@ -1373,7 +1395,7 @@ No devuelvas nada más que el JSON limpio.
           //   - Además protege el caso de un CONSUMO con tarjeta mal categorizado como "Pago Tarjeta"
           //     (ese llega con tarjeta_id y sin cuenta_id): sin la guarda se le anularía la tarjeta
           //     y encima se le restaría deuda, con un error del doble del monto.
-          const esPagoTarjeta = catNorm.includes("pago") && catNorm.includes("tarjeta");
+          const esPagoTarjeta = catNorm.includes("pago") && catNorm.includes("tarjeta") && !janoDijoTransferencia;
           if (esPagoTarjeta && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id && !txEspejoTarjeta) {
             // La tarjeta se deduce SOLO de lo que describe el pago. NO se usa banco_o_metodo como
             // respaldo: ese es el banco de DÓNDE SALIÓ la plata, no cuál se pagó, y usarlo hace que
