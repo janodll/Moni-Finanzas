@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Mutex } from 'async-mutex';
 import { dbGetTransacciones, dbInsert, dbInsertPair, dbUpdate, dbDelete, dbDeleteByTransfer } from './db.js';
-import { resolveAccountOrCard, buscarCuentaEnTexto, normalizarUltimos4, esTransferenciaSegunUsuario } from './resolver.js';
+import { resolveAccountOrCard, buscarCuentaEnTexto, esTransferenciaSegunUsuario } from './resolver.js';
 
 const stateMutex = new Mutex();
 
@@ -876,7 +876,6 @@ async function handleAutoRegister(req, res) {
     nro_operacion: nro_operacion || null,
     banco_o_metodo: banco_o_metodo,
     descripcion_original: descripcion_original || banco_o_metodo,
-    ultimos4: normalizarUltimos4(ultimos4),
     created_at: new Date().toISOString()
   };
 
