@@ -1396,6 +1396,46 @@ No devuelvas nada más que el JSON limpio.
           //     (ese llega con tarjeta_id y sin cuenta_id): sin la guarda se le anularía la tarjeta
           //     y encima se le restaría deuda, con un error del doble del monto.
           const esPagoTarjeta = catNorm.includes("pago") && catNorm.includes("tarjeta") && !janoDijoTransferencia;
+          // [PASO 1] Si el pago llegó sin cuenta de origen, se intenta sacarla de lo que
+          // escribió Jano. Esto va ANTES de armar el espejo y no después: antes vivía en un
+          // `else if`, así que cuando la cuenta se recuperaba acá, el bloque que BAJA LA DEUDA
+          // ya no corría. Caso real: el pago de la SIP del 22/10 por S/ 218.93 — el correo decía
+          // "Tarjeta Izipay Andrea" (que no existe), la cuenta se recuperó de la respuesta, la
+          // plata salió del BCP de Andrea, y la deuda de la SIP nunca bajó. Medio registro.
+          if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id && !txEspejoTarjeta) {
+            // Pago de tarjeta del que no se sabe de qué cuenta salió la plata (típico cuando el
+            // correo es la "constancia de pago" que manda la TARJETA, no la cuenta de débito).
+            // Sin cuenta origen no se puede armar el par.
+            //
+            // CRÍTICO: hay que soltar el tarjeta_id. Estos correos llegan con la tarjeta ya
+            // resuelta, y un GASTO con tarjeta_id le SUMA deuda a esa tarjeta — o sea que un
+            // pago terminaría aumentando la deuda en vez de bajarla, que es el error opuesto y
+            // peor que no hacer nada. Se deja la fila inerte (sin cuenta ni tarjeta) para que
+            // quede el registro visible, y se explica cómo registrarlo bien.
+            // Ultimo intento antes de rendirse: que la cuenta la haya nombrado el propio Jano
+            // en su respuesta. Se mira SOLO `text` (lo que el escribio), nunca banco_o_metodo
+            // ni descripcion_original — esos nombran el banco de ORIGEN del correo y usarlos es
+            // exactamente lo que acreditaba la plata en la cuenta equivocada (ESTADO seccion 2).
+            // buscarCuentaEnTexto devuelve null ante cualquier ambiguedad, asi que esto solo
+            // puede completar una fila que igual iba a quedar inerte; nunca cambia una ya resuelta.
+            const cuentaDicha = buscarCuentaEnTexto(text, state);
+            if (cuentaDicha) {
+              pendingTx.cuenta_id = cuentaDicha.id;
+              pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta una tarjeta
+              reminderMsgAddon += `\n🏦 _Pago registrado desde "${cuentaDicha.nombre}"._`;
+              console.log(`[Pago Tarjeta] Cuenta de origen tomada de la respuesta del usuario: ${cuentaDicha.nombre} (id=${cuentaDicha.id}).`);
+            } else {
+            if (pendingTx.tarjeta_id) {
+              console.log(`[Pago Tarjeta] Se suelta tarjeta_id ${pendingTx.tarjeta_id}: un GASTO sobre la tarjeta le aumentaría la deuda a un pago.`);
+              pendingTx.tarjeta_id = null;
+            }
+            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que quedó sin asignar y el saldo de tu cuenta no bajó._\n💡 _La próxima vez dime la cuenta en tu respuesta (ej: "pagué la tarjeta desde Interbank Jano") y lo completo solo._`;
+            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}", respuesta="${(text || '').trim()}"). No se crea espejo.`);
+            }
+          }
+
+          // [PASO 2] Con la cuenta de origen ya resuelta (venga del correo o del PASO 1),
+          // se identifica la tarjeta pagada y se arma el INGRESO que le baja la deuda.
           if (esPagoTarjeta && pendingTx.tipo === "GASTO" && pendingTx.cuenta_id && !txEspejoTarjeta) {
             // La tarjeta se deduce SOLO de lo que describe el pago. NO se usa banco_o_metodo como
             // respaldo: ese es el banco de DÓNDE SALIÓ la plata, no cuál se pagó, y usarlo hace que
@@ -1427,37 +1467,8 @@ No devuelvas nada más que el JSON limpio.
               reminderMsgAddon += `\n⚠️ _No identifiqué qué tarjeta pagaste, así que su deuda no bajó. Corrígelo desde la web._`;
               console.log(`[Pago Tarjeta] No se pudo identificar la tarjeta pagada con "${textoPago.trim()}". No se crea espejo.`);
             }
-          } else if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id && !txEspejoTarjeta) {
-            // Pago de tarjeta del que no se sabe de qué cuenta salió la plata (típico cuando el
-            // correo es la "constancia de pago" que manda la TARJETA, no la cuenta de débito).
-            // Sin cuenta origen no se puede armar el par.
-            //
-            // CRÍTICO: hay que soltar el tarjeta_id. Estos correos llegan con la tarjeta ya
-            // resuelta, y un GASTO con tarjeta_id le SUMA deuda a esa tarjeta — o sea que un
-            // pago terminaría aumentando la deuda en vez de bajarla, que es el error opuesto y
-            // peor que no hacer nada. Se deja la fila inerte (sin cuenta ni tarjeta) para que
-            // quede el registro visible, y se explica cómo registrarlo bien.
-            // Ultimo intento antes de rendirse: que la cuenta la haya nombrado el propio Jano
-            // en su respuesta. Se mira SOLO `text` (lo que el escribio), nunca banco_o_metodo
-            // ni descripcion_original — esos nombran el banco de ORIGEN del correo y usarlos es
-            // exactamente lo que acreditaba la plata en la cuenta equivocada (ESTADO seccion 2).
-            // buscarCuentaEnTexto devuelve null ante cualquier ambiguedad, asi que esto solo
-            // puede completar una fila que igual iba a quedar inerte; nunca cambia una ya resuelta.
-            const cuentaDicha = buscarCuentaEnTexto(text, state);
-            if (cuentaDicha) {
-              pendingTx.cuenta_id = cuentaDicha.id;
-              pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta una tarjeta
-              reminderMsgAddon += `\n🏦 _Pago registrado desde "${cuentaDicha.nombre}"._`;
-              console.log(`[Pago Tarjeta] Cuenta de origen tomada de la respuesta del usuario: ${cuentaDicha.nombre} (id=${cuentaDicha.id}).`);
-            } else {
-            if (pendingTx.tarjeta_id) {
-              console.log(`[Pago Tarjeta] Se suelta tarjeta_id ${pendingTx.tarjeta_id}: un GASTO sobre la tarjeta le aumentaría la deuda a un pago.`);
-              pendingTx.tarjeta_id = null;
-            }
-            reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió este pago, así que quedó sin asignar y el saldo de tu cuenta no bajó._\n💡 _La próxima vez dime la cuenta en tu respuesta (ej: "pagué la tarjeta desde Interbank Jano") y lo completo solo._`;
-            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}", respuesta="${(text || '').trim()}"). No se crea espejo.`);
-            }
           }
+
 
           // [Transferencia Automática] El correo del banco NO dice a qué cuenta llegó la plata:
           // solo trae el nombre del destinatario ("Transferencia a Andrea Zuniga Martinez De P.").
