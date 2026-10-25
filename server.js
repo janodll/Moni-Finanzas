@@ -336,6 +336,29 @@ async function notifyAdminError(context, errorMessage) {
 // descartando las palabras genéricas ("tarjeta") y los nombres de persona.
 // Devuelve null si hay 0 candidatas o si quedan varias sin poder desempatar por persona:
 // es preferible no hacer nada a restarle la deuda a la tarjeta equivocada.
+// Arma el INGRESO que baja la deuda de la tarjeta pagada, a partir de lo que describe
+// el pago. Devuelve null si no se puede identificar cuál es: adivinar le bajaría la
+// deuda a la tarjeta equivocada, que es peor que no hacer nada.
+function armarEspejoPagoTarjeta(pendingTx, state) {
+  const textoPago = `${pendingTx.descripcion || ''} ${pendingTx.descripcion_original || ''}`;
+  const tarjeta = buscarTarjetaEnTexto(textoPago, state);
+  if (!tarjeta) return null;
+  return {
+    tarjeta,
+    espejo: {
+      fecha: pendingTx.fecha,
+      tipo: "INGRESO",
+      categoria: "Pago Tarjeta",
+      descripcion: `Pago de Tarjeta ${tarjeta.nombre}`,
+      monto: pendingTx.monto,
+      moneda: pendingTx.moneda,
+      cuenta_id: null,
+      tarjeta_id: tarjeta.id,
+      fijo: "Variable"
+    }
+  };
+}
+
 function buscarTarjetaEnTexto(texto, state) {
   const norm = (str) => (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const t = norm(texto);
@@ -1208,6 +1231,40 @@ app.post('/api/telegram-webhook', async (req, res) => {
       }
 
       const pendingTx = state.transacciones_pendientes[pendingTxIndex];
+
+      // [Esperando cuenta] Este pendiente ya tiene categoría y descripción: lo único que
+      // falta es de qué cuenta salió la plata, y se la pedimos en el mensaje anterior.
+      // Esta respuesta es ese dato, no una categoría — así que no se le pasa a la IA.
+      if (pendingTx.esperando_cuenta) {
+        const cuentaDicha = buscarCuentaEnTexto(text, state);
+        if (!cuentaDicha) {
+          const opciones = (state.cuentas || []).map(c => c.nombre).join(', ');
+          await sendTelegramMessage(chatId, `⚠️ No reconocí esa cuenta. Escribe solo el nombre, tal cual:\n_${opciones}_`);
+          return res.sendStatus(200);
+        }
+        pendingTx.cuenta_id = cuentaDicha.id;
+        pendingTx.tarjeta_id = null; // el GASTO sale de una cuenta; nunca aumenta una tarjeta
+        delete pendingTx.esperando_cuenta;
+        state.transacciones_pendientes.splice(pendingTxIndex, 1);
+
+        const armado = armarEspejoPagoTarjeta(pendingTx, state);
+        const guardada = armado
+          ? (await dbInsertPair(pendingTx, armado.espejo)).gasto
+          : await dbInsert(pendingTx);
+
+        state.updated_at = new Date().toISOString();
+        if (SUPABASE_URL && SUPABASE_KEY) await uploadToSupabase(state);
+        saveLocalDataSync(state);
+
+        const extra = armado
+          ? `\n💳 _Deuda de "${armado.tarjeta.nombre}" reducida en ${pendingTx.moneda || 'S/.'} ${pendingTx.monto}._`
+          : `\n⚠️ _No identifiqué qué tarjeta pagaste, así que su deuda no bajó. Corrígelo desde la web._`;
+        await sendTelegramMessage(chatId,
+          `✅ *Registrado con éxito!*\nMonto: *${pendingTx.moneda} ${pendingTx.monto}*\nCategoría: *${pendingTx.categoria}*\nDetalle: _${pendingTx.descripcion}_\n🏦 _Pagado desde "${cuentaDicha.nombre}"._${extra}`);
+        console.log(`[Pago Tarjeta] Completado tras preguntar la cuenta: ${cuentaDicha.nombre} (id=${cuentaDicha.id}), tx ${guardada && guardada.id}.`);
+        return res.sendStatus(200);
+      }
+
       const apiKey = process.env.GEMINI_API_KEY;
       if (!apiKey) {
         await sendTelegramMessage(chatId, "⚠️ No se configuró GEMINI_API_KEY en el servidor para procesar la categorización.");
@@ -1561,6 +1618,27 @@ No devuelvas nada más que el JSON limpio.
             // No se supo de qué cuenta salió: sin origen no hay transferencia que espejar.
             reminderMsgAddon += `\n⚠️ _No identifiqué de qué cuenta salió esta transferencia, así que quedó sin asignar. Corrígela desde la web._`;
             console.log(`[Transferencia Automática] Sin cuenta de origen (banco_o_metodo="${pendingTx.banco_o_metodo || ''}"). No se crea espejo.`);
+          }
+
+          // [Falta la cuenta de origen] Un pago de tarjeta sin cuenta de origen NO se registra.
+          // Antes se guardaba igual y quedaba la fila en "N/A": no movía plata de ningún lado,
+          // pero Telegram decía "Registrado con éxito". Así se perdieron pagos durante meses.
+          //
+          // Tampoco se asume una cuenta por defecto según la tarjeta: Jano paga la CMR desde el
+          // BCP y eso varía, así que una cuenta asumida mal sería peor que preguntar — se
+          // equivocaría en silencio. Se devuelve a la cola y se pide el dato.
+          if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id) {
+            pendingTx.esperando_cuenta = true;
+            state.transacciones_pendientes.splice(pendingTxIndex, 0, pendingTx);
+            state.updated_at = new Date().toISOString();
+            if (SUPABASE_URL && SUPABASE_KEY) await uploadToSupabase(state);
+            saveLocalDataSync(state);
+
+            const opciones = (state.cuentas || []).map(c => c.nombre).join(', ');
+            await sendTelegramMessage(chatId,
+              `⚠️ *Me falta un dato para registrar esto*\nMonto: *${pendingTx.moneda} ${pendingTx.monto}*\nDetalle: _${pendingTx.descripcion}_\n\n*¿Desde qué cuenta pagaste?* Responde solo el nombre.\n_${opciones}_\n\nNo lo registré todavía: sin saber de dónde salió la plata, quedaría un movimiento que no descuenta de ninguna cuenta.`);
+            console.log(`[Pago Tarjeta] Sin cuenta de origen (banco="${pendingTx.banco_o_metodo || ''}", respuesta="${(text || '').trim()}"). Devuelto a la cola, se pregunta la cuenta.`);
+            return res.sendStatus(200);
           }
 
           // Con espejo de tarjeta se insertan las dos piernas enlazadas por transfer_id (igual
