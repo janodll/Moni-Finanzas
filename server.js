@@ -1401,7 +1401,13 @@ No devuelvas nada más que el JSON limpio.
           // ya no corría. Caso real: el pago de la SIP del 22/10 por S/ 218.93 — el correo decía
           // "Tarjeta Izipay Andrea" (que no existe), la cuenta se recuperó de la respuesta, la
           // plata salió del BCP de Andrea, y la deuda de la SIP nunca bajó. Medio registro.
-          if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id && !txEspejoTarjeta) {
+          // Sin `!txEspejoTarjeta`: recuperar la cuenta de ORIGEN no tiene nada que ver con
+          // que el espejo ya exista. Cuando el recordatorio de la tarjeta calzaba, ESE bloque
+          // armaba el espejo y entonces este se saltaba entero, dejando el gasto sin cuenta.
+          // Caso real: el pago del 24/10 por S/ 254.45 — Jano escribio "pagado con mi cuenta
+          // interbank jano", la frase se reconoce perfecto, y aun asi la fila quedo en N/A
+          // porque este bloque nunca llego a leerla. Tercera variante del mismo error.
+          if (esPagoTarjeta && pendingTx.tipo === "GASTO" && !pendingTx.cuenta_id) {
             // Pago de tarjeta del que no se sabe de qué cuenta salió la plata (típico cuando el
             // correo es la "constancia de pago" que manda la TARJETA, no la cuenta de débito).
             // Sin cuenta origen no se puede armar el par.
