@@ -45,7 +45,6 @@ function renderDeudaSplit(balances, mon) {
 
   const compras = cuotas.detalle.length;
   const faltan = Math.max(...cuotas.detalle.map(d => d.restantes));
-  const pendienteTotal = cuotas.saldoEnDeuda + cuotas.comprometidoFuturo;
 
   // Se habla de CUOTAS que faltan, no de meses: que falten 5 cuotas no promete
   // que se paguen una por mes. Y si hace rato que nadie confirma en qué cuota
@@ -55,11 +54,15 @@ function renderDeudaSplit(balances, mon) {
     ? ` · ⚠️ ${viejas} sin confirmar hace meses`
     : "";
 
+  // Estas dos SUMAN el total de arriba y nada mas: lo que ya esta cargado en las
+  // tarjetas. Antes "En cuotas" incluia tambien las cuotas que el banco todavia no
+  // cobro, y el desglose daba S/ 1,751 mas que su propio titulo. Dos cosas ciertas
+  // por separado que mezcladas dan un numero que no existe.
   const filas = [
     {
       label: "En cuotas",
       sub: `${compras} ${compras === 1 ? "compra" : "compras"} · faltan ${faltan} ${faltan === 1 ? "cuota" : "cuotas"}${aviso}`,
-      val: pendienteTotal
+      val: cuotas.saldoEnDeuda
     },
     {
       label: "Consumo del ciclo",
@@ -67,6 +70,16 @@ function renderDeudaSplit(balances, mon) {
       val: balances.consumoRotativo || 0
     }
   ];
+
+  // Las cuotas que el banco factura mes a mes todavia no estan en la deuda. Van
+  // aparte y fuera de la suma, dichas con todas sus letras.
+  if (cuotas.comprometidoFuturo > 0.005) {
+    filas.push({
+      label: "Cuotas por venir",
+      sub: "comprometidas, el banco aún no las cobra",
+      val: cuotas.comprometidoFuturo
+    });
+  }
 
   cont.innerHTML = filas.map(f => `
     <div class="deuda-split-row">
