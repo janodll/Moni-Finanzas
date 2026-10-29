@@ -47,7 +47,17 @@ function procesarCorreosMoni() {
   // del dominio exacto: si un banco cambia de dominio (p.ej. Interbank usa netinterbank.com.pe),
   // igual se captura porque el cuerpo siempre menciona el banco. Los promos que entren de más
   // los descarta la IA con {"tipo":"IGNORAR"}. Mismo enfoque que el lector de Andrea.
-  const query = 'is:unread newer_than:1d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank)';
+  //
+  // Marcador de procesado: una ETIQUETA, no el estado leido/no leido. Antes la
+  // consulta pedia `is:unread` y eso perdia correos en silencio: si alguien abria el
+  // correo antes de que corriera el script, quedaba leido y no se procesaba nunca mas.
+  // Lo destapo el lector de Andrea —ella abre sus correos, y asi se perdio el pago de
+  // su tarjeta del 15/10 por S/ 736.60—, pero el riesgo era el mismo aca.
+  //
+  // Y `newer_than:1d` daba un solo dia de margen: si el script fallaba una vez, el
+  // correo quedaba fuera de alcance para siempre. Ahora son 7 dias.
+  const LABEL_PROCESADO = 'MoniProcesado';
+  const query = '-label:' + LABEL_PROCESADO + ' newer_than:7d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank)';
   const hilos = GmailApp.search(query, 0, 10);
   
   if (hilos.length === 0) {
@@ -55,25 +65,27 @@ function procesarCorreosMoni() {
     return;
   }
 
+  const etiqueta = GmailApp.getUserLabelByName(LABEL_PROCESADO) || GmailApp.createLabel(LABEL_PROCESADO);
+
   for (const hilo of hilos) {
     const mensajes = hilo.getMessages();
+    let todoOk = true;
     for (const mensaje of mensajes) {
-      if (mensaje.isUnread()) {
-        const asunto = mensaje.getSubject();
-        const cuerpo = mensaje.getPlainBody();
-        
-        Logger.log("Procesando: " + asunto);
-        const enviadoOk = extraerDatosConGemini(asunto, cuerpo);
+      const asunto = mensaje.getSubject();
+      const cuerpo = mensaje.getPlainBody();
 
-        // Marca como leído SOLO si el backend confirmó recepción (200) o si la IA
-        // decidió ignorarlo. Si Render está dormido/falla, el correo queda no leído
-        // para reintentarlo en el próximo ciclo del trigger sin perder el gasto.
-        if (enviadoOk) {
-          mensaje.markRead();
-        } else {
-          Logger.log("No se marcó como leído: el backend no confirmó el registro. Se reintentará.");
-        }
+      Logger.log("Procesando: " + asunto);
+      const enviadoOk = extraerDatosConGemini(asunto, cuerpo);
+
+      // Si Render está dormido o falla, el hilo NO se etiqueta y se reintenta en la
+      // próxima corrida. Con 7 días de margen hay tiempo de sobra para recuperarlo.
+      if (!enviadoOk) {
+        todoOk = false;
+        Logger.log("No se etiquetó: el backend no confirmó el registro. Se reintentará.");
       }
+    }
+    if (todoOk) {
+      hilo.addLabel(etiqueta);
     }
   }
 }

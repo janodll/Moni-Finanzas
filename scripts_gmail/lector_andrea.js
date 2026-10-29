@@ -45,7 +45,18 @@ function fetchGeminiConFallback(payload) {
 
 function procesarCorreosMoniAndrea() {
   // Busca correos no leídos de los bancos
-  const query = 'is:unread newer_than:1d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank OR cencosud OR sip)';
+  // Marcador de procesado: una ETIQUETA, no el estado leido/no leido.
+  //
+  // Antes la consulta pedia `is:unread`, y eso perdia correos en silencio: si Andrea
+  // abria el correo antes de que corriera el script, quedaba leido y no se procesaba
+  // nunca mas. El caso que lo destapo: el pago de la tarjeta de Andrea del 15/10 por
+  // S/ 736.60 — le llega la confirmacion a ella, la abre para verificar que entro, y
+  // Moni ya no se entera. Tres semanas despues su cuenta no cuadraba por ese monto.
+  //
+  // Y `newer_than:1d` daba un solo dia de margen: si el script fallaba una vez, el
+  // correo quedaba fuera de alcance para siempre. Ahora son 7 dias.
+  const LABEL_PROCESADO = 'MoniProcesado';
+  const query = '-label:' + LABEL_PROCESADO + ' newer_than:7d (yape OR plin OR bcp OR interbank OR bbva OR falabella OR scotiabank OR cencosud OR sip)';
   const hilos = GmailApp.search(query, 0, 10);
   
   if (hilos.length === 0) {
@@ -53,10 +64,13 @@ function procesarCorreosMoniAndrea() {
     return;
   }
 
+  const etiqueta = GmailApp.getUserLabelByName(LABEL_PROCESADO) || GmailApp.createLabel(LABEL_PROCESADO);
+
   for (const hilo of hilos) {
     const mensajes = hilo.getMessages();
+    let todoOk = true;
     for (const mensaje of mensajes) {
-      if (mensaje.isUnread()) {
+      {
         const asunto = mensaje.getSubject();
         const cuerpo = mensaje.getPlainBody();
         
@@ -65,11 +79,16 @@ function procesarCorreosMoniAndrea() {
         // Aquí atrapamos si funcionó bien o no
         const enviadoOk = extraerDatosConGemini(asunto, cuerpo);
         
-        // CANDADO: Solo marca como leído si no hubo errores de JSON ni de servidor
-        if (enviadoOk) {
-          mensaje.markRead();
+        // CANDADO: si algo fallo, el hilo NO se etiqueta y se reintenta en la
+        // proxima corrida (hay 7 dias de margen).
+        if (!enviadoOk) {
+          todoOk = false;
         }
       }
+    }
+    // El hilo entero quedo procesado: se etiqueta para no volver a leerlo.
+    if (todoOk) {
+      hilo.addLabel(etiqueta);
     }
   }
 }
